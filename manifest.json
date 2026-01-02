@@ -1,0 +1,11 @@
+{
+  "name": "songgeneration-mcp",
+  "description": "AI-powered song generation server using Tencent AI Lab's LeVo model. Supports lyrics, style control, and stem separation.",
+  "version": "0.1.0",
+  "author": "",
+  "license": "MIT",
+  "mcp": {
+    "command": "python",
+    "args": ["-m", "songgeneration_mcp", "mcp_server"]
+  }
+}
