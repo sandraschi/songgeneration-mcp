@@ -1,15 +1,21 @@
 """Unit tests for songgeneration_mcp tools."""
+
 import pytest
+
 from songgeneration_mcp.mcp_server import app
 
 
-def test_help_tool_exists():
+@pytest.mark.asyncio
+async def test_help_tool_exists():
     """Test that help tool exists."""
-    tools = [tool.name for tool in app.list_tools()]
-    assert "help" in tools
+    tools = await app.list_tools()
+    names = [tool.name for tool in tools]
+    assert "help" in names
 
 
-def test_status_tool_exists():
-    """Test that status tool exists."""
-    tools = [tool.name for tool in app.list_tools()]
-    assert "status" in tools
+@pytest.mark.asyncio
+async def test_get_status_tool_exists():
+    """Test that get_status tool exists."""
+    tools = await app.list_tools()
+    names = [tool.name for tool in tools]
+    assert "get_status" in names

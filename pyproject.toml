@@ -1,33 +1,34 @@
 [project]
 name = "songgeneration_mcp"
 version = "0.1.0"
-description = "AI-powered song generation server using Tencent AI Lab's LeVo model. Supports lyrics, style control, and stem separation."
+description = "SongGeneration v2 (LeVo 2 / SG2) MCP server: local open-weight music LM via SongGeneration-Studio; dual-track output and SG2 tags."
 authors = [{name = "MCP Studio"}]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 readme = "README.md"
 license = {text = "MIT"}
 dependencies = [
-    "fastmcp[all]>=2.13.1,<2.14.0",
+    "fastmcp>=3.1.0,<4",
+    "httpx>=0.27.0",
+    "starlette>=0.40.0",
+    "uvicorn[standard]>=0.30.0",
+    "ruff>=0.15.2",
+    "imageio-ffmpeg>=0.6.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "respx>=0.21.0",
     "ruff>=0.1.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/sandraschi/songgeneration-mcp"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.ruff]
-line-length = 100
-target-version = "py311"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "N", "W"]
-ignore = []
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -37,3 +38,32 @@ asyncio_mode = "auto"
 [tool.coverage.run]
 source = ["src"]
 omit = ["tests/*", "*/__pycache__/*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# Hardened v13.1 Rule Set
+select = [
+    "E", "F", "I", "UP", "B", "S", "A", "ANN", "COM", "C4", "DTZ", "PIE", "T20", "PYI", "Q", "RSE", "RET", "SLF", "SIM", "TID", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "PERF", "FURB", "LOG", "RUF"
+]
+ignore = [
+    "ANN101", # Missing type annotation for self
+    "ANN102", # Missing type annotation for cls
+    "COM812", # Trailing comma missing (handled by formatter)
+    "ISC001", # Single line implicit string concatenation (handled by formatter)
+    "PLR0913", # Too many arguments
+    "S101",   # Use of assert (standard for pytest)
+    "TRY003", # Avoid specifying long messages in exceptions
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "ANN", "PLR", "TRY", "S105", "S106", "SLF001", "ARG002", "PLC0415"]
+"server.py" = ["T20", "ARG001", "ARG002"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

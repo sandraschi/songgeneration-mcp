@@ -1,0 +1,21 @@
+---
+description: Ensure all MCP development follows SOTA Standards for documentation, response patterns, and architectural consistency.
+globs: ["**/*.py", "**/*.md", "**/*.json", "**/mcp_server.py"]
+alwaysApply: true
+---
+
+# MCP SOTA Standards (Centralized)
+
+This repository follows the Model Context Protocol (MCP) SOTA standards managed in the `mcp-central-docs` repository.
+
+## Core References
+- [STANDARDS.md](file:///d:/Dev/repos/mcp-central-docs/STANDARDS.md)
+- [gemini.md](file:///d:/Dev/repos/mcp-central-docs/gemini.md)
+- [cursor.md](file:///d:/Dev/repos/mcp-central-docs/docs/ecosystem/cursor/README.md)
+
+## Key Requirements
+1. **Config & Log Locations**: Refer to Section 2.3 in [STANDARDS.md](file:///d:/Dev/repos/mcp-central-docs/STANDARDS.md) for standardized Windows paths.
+2. **Startup Diagnostics**: Section 2.3 contains crucial paths for debugging startup failures (e.g., `%APPDATA%\Claude\logs` or `%APPDATA%\Cursor\logs`).
+3. **FastMCP Compliance**: Use FastMCP 2.14.1+ standards for tool families, portmanteau patterns, and structured returns.
+
+When implementing new tools or modifying server logic, always ensure compliance with the centralized standards to maintain the "neural grid" alignment.

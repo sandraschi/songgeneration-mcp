@@ -1,16 +1,15 @@
 """Main MCP server module.
 
-Tencent SongGeneration v2 (LeVo 2 / SG2): lyrics, style, dual-track output, optional Style RAG.
+AI-powered song generation server using Tencent AI Lab's LeVo model.
+Supports lyrics, style control, and stem separation.
 """
 
 import logging
+from typing import List
 
 from fastmcp import FastMCP
 
 from .logic import SongGenerationLogic
-from .lyria_compare import get_lyria_vs_sg2_text
-from .sg2 import SG2_STRUCTURAL_TAGS_REFERENCE
-from .transport import run_server
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -22,40 +21,20 @@ SONG_REQUEST_SCHEMA = {
     "type": "object",
     "properties": {
         "title": {"type": "string", "description": "Title of the song"},
-        "lyrics": {
-            "type": "string",
-            "description": (
-                "Complete lyrics (SG2: length tags; English lines end with '.' before ';')"
-            ),
-        },
+        "lyrics": {"type": "string", "description": "Complete lyrics"},
         "genre": {"type": "string", "description": "Musical genre"},
         "emotion": {"type": "string", "description": "Musical emotion/mood"},
         "bpm": {"type": "integer", "description": "Beats per minute"},
         "voice": {"type": "string", "enum": ["Male", "Female"], "default": "Female"},
         "output_mode": {"type": "string", "enum": ["mixed", "separate"], "default": "separate"},
-        "model_repo": {"type": "string", "default": "tencent/SongGeneration"},
-        "model_weights": {"type": "string", "default": "v2-large"},
-        "max_length_seconds": {"type": "integer", "default": 270},
-        "torch_dtype": {"type": "string", "default": "bfloat16"},
-        "style_audio_prompt_path": {
-            "type": "string",
-            "description": (
-                "Optional path to ~10s audio on the Studio host for style cloning (Style RAG)"
-            ),
-        },
-        "mix_dual_tracks": {"type": "boolean", "default": False},
     },
     "required": ["lyrics"],
 }
 
 app = FastMCP(
     "songgeneration-mcp",
-    instructions=(
-        "SongGeneration SOTA MCP — Tencent SongGeneration v2 (LeVo 2, open weights) via "
-        "SongGeneration-Studio. Default tencent/SongGeneration v2-large; max_length 270s; "
-        "bfloat16; 48 kHz dual-track (vocal.wav / inst.wav). SG2 lyrics rules apply. "
-        "Resource docs://lyria-vs-sg2 compares local SG2 to cloud Gemini Lyria 3 Pro (~Mar 2026)."
-    ),
+    title="SongGeneration SOTA MCP",
+    description="Advanced AI song generation utilizing Tencent LeVo via SongGeneration-Studio.",
 )
 logic = SongGenerationLogic()
 
@@ -66,18 +45,6 @@ def get_song_schema() -> str:
     import json
 
     return json.dumps(SONG_REQUEST_SCHEMA, indent=2)
-
-
-@app.resource("sg2://structural-tags")
-def get_sg2_structural_tags() -> str:
-    """SG2 (LeVo 2) length-sensitive markers and dual-track output notes."""
-    return SG2_STRUCTURAL_TAGS_REFERENCE.strip()
-
-
-@app.resource("docs://lyria-vs-sg2")
-def get_lyria_vs_sg2_resource() -> str:
-    """LeVo 2 (SG2) vs Gemini Lyria 3 Pro: local open-weight vs cloud Gemini pricing and fit."""
-    return get_lyria_vs_sg2_text().strip()
 
 
 @app.resource("system://gpu-status")
@@ -109,16 +76,15 @@ Once ready, use the `generate_song` tool to start production."""
 
 @app.prompt("lyric-assistant")
 def prompt_lyric_assistant(lyrics: str) -> str:
-    """Analyzes and refines lyrics for optimal generation with the LeVo 2 (SG2) model."""
-    return f"""Optimize the following lyrics for SongGeneration v2 (SG2):
+    """Analyzes and refines lyrics for optimal generation with the LeVo model."""
+    return f"""Optimize the following lyrics for an AI song generation model:
 
 {lyrics}
 
 Focus on:
-- SG2 length tags where needed: [intro-short], [intro-medium], [inst-short], [inst-medium],
-  [outro-short], [outro-medium].
-- English lines: end each line with '.' before the section separator ';'.
-- Rhyme scheme and rhythm; Verse-Chorus flow; emotional resonance.
+- Rhyme scheme and rhythm consistency.
+- Phrasing that fits typical song structures (Verse-Chorus).
+- Emotional resonance aligned with the mood.
 """
 
 
@@ -128,24 +94,17 @@ async def help(level: str = "basic", topic: str | None = None) -> str:
 
     Args:
         level: Detail level - "basic", "intermediate", or "advanced"
-        topic: Optional focus; use topic="lyria" for SG2 vs Gemini Lyria 3 Pro (any level)
+        topic: Optional topic to focus on
 
     Returns:
         Help text for the server
     """
-    if topic and "lyria" in topic.lower():
-        return get_lyria_vs_sg2_text()
-
     if level == "basic":
         return """# songgeneration-mcp Help
 
 ## Overview
-Tencent SongGeneration v2 (LeVo 2, open weights) via SongGeneration-Studio.
-SG2 length tags, dual-track output (vocal.wav / inst.wav), optional style audio prompt.
-
-**Landscape:** **Gemini Lyria 3 Pro** (~Mar 2026) is often ~**$0.08/track** in Gemini (**verify**).
-This stack is **local**—strong for **classical**, **rubato**, and **instrumental** nuance.
-See `docs://lyria-vs-sg2` or `help(topic="lyria")`.
+AI-powered song generation server using Tencent AI Lab's LeVo model.
+Supports lyrics, style control, and stem separation.
 
 ## Available Tools
 - list_models: Show available generation models
@@ -153,7 +112,7 @@ See `docs://lyria-vs-sg2` or `help(topic="lyria")`.
 - get_status: Monitor VRAM and active generation tasks
 - cancel_generation: Stop an active generation task
 - unload_models: Free GPU memory
-- diagnostics: Get server diagnostic information
+- status: Get server diagnostic information
 - help: Show this help message
 """
     elif level == "intermediate":
@@ -168,37 +127,25 @@ See `docs://lyria-vs-sg2` or `help(topic="lyria")`.
 ## Examples
 - generate_song(lyrics="Verse 1...", genre="Pop", mood="Energetic")
 - get_status()
-- help(topic="lyria") — SG2 vs Gemini Lyria 3 Pro snapshot
 """
     else:
         return """# songgeneration-mcp - Advanced Help
 
 ## Under the Hood
-Bridges to SongGeneration-Studio REST. Payloads include an `sg2` block (repo, v2-large,
-max_length_seconds=270, torch_dtype=bfloat16, dual tracks, optional style_rag).
-Resource `sg2://structural-tags` lists SG2 length markers.
-
-## SG2 vs Gemini Lyria 3 Pro (March 2026)
-- **Lyria 3 Pro**: Cloud + Gemini; **low $/track** (~**$0.08/song** in many tiers—**verify**).
-  Strong fit for fast iteration and Google's AI roadmap.
-- **LeVo 2 / SG2**: **Local** open-weight path; upfront GPU; no per-song cloud meter.
-  Often stronger for **classical**, **rubato**, and **instrumental** articulation; SG2 length tags
-  reduce generic section timing. Useful **counterweight** to **US-centric** commercial defaults—
-  not a knock on Google's push (many teams use **both**).
-
-Full write-up: resource `docs://lyria-vs-sg2` or `help(topic="lyria")`.
+This server bridges to the SongGeneration-Studio backend.
+It uses standard SOTA patterns for VRAM management and task queuing.
 """
 
 
 @app.tool()
-async def list_models() -> list[str]:
+async def list_models() -> List[str]:
     """List all available high-quality song generation models from the backend.
 
     Retrieves the list of model identifiers currently supported by the
     SongGeneration-Studio model server.
 
     Returns:
-        List of model ID strings (e.g. tencent/SongGeneration::v2-large when exposed by Studio).
+        List of model ID strings (e.g., ["levo-v1", "studio-v2"]).
     """
     return await logic.list_models()
 
@@ -210,42 +157,28 @@ async def generate_song(
     mood: str = "Happy",
     tempo: int = 120,
     voice: str = "Female",
-    structure: list[str] | None = None,
+    structure: List[str] = ["Verse", "Chorus"],
     separate_stems: bool = True,
-    title: str | None = None,
-    model_repo: str | None = None,
-    model_weights: str | None = None,
-    max_length_seconds: int = 270,
-    torch_dtype: str = "bfloat16",
-    style_audio_prompt_path: str | None = None,
-    mix_dual_tracks: bool = False,
-    auto_fix_english_punctuation: bool = True,
 ) -> str:
-    """GENERATE_SONG — Start LeVo 2 (SongGeneration v2) generation via SongGeneration-Studio.
+    """Generate a high-quality song with vocals and professional backing tracks.
 
-    PORTMANTEAU PATTERN RATIONALE: One MCP entry point for lyrics, SG2 inference flags,
-    dual-track output, and optional Style RAG (10s audio prompt), matching fleet docstring style.
+    This tool triggers the full generation pipeline:
+    1. Loads the required LeVo model into GPU VRAM.
+    2. Processes lyrics for vocal synthesis.
+    3. Generates instrumental backing tracks.
+    4. Performs mixing and optional stem separation.
 
     Args:
-        lyrics: Full lyrics. Use SG2 length tags ([intro-short], [chorus], etc.) and ';' between
-            sections. For English, each line should end with '.' before ';' (optional auto-fix).
-        genre: Musical genre (e.g. Rock, Pop).
-        mood: Emotional vibe.
-        tempo: BPM (about 60–180).
-        voice: "Male" or "Female".
-        structure: Section order hint for the client (passed through for future Studio use).
-        separate_stems: If True (default), request dual-track output (vocal.wav + inst.wav).
-        title: Optional song title.
-        model_repo: Hugging Face repo id (default tencent/SongGeneration or env SONGGEN_MODEL_REPO).
-        model_weights: Weight variant (default v2-large or env SONGGEN_MODEL_WEIGHTS).
-        max_length_seconds: Max generation length (default 270 ≈ 4.5 min).
-        torch_dtype: e.g. bfloat16 for ~22GB VRAM on Large.
-        style_audio_prompt_path: Path on the Studio machine to a ~10s WAV for style cloning.
-        mix_dual_tracks: If True, prefer a single mixed master when the backend supports it.
-        auto_fix_english_punctuation: Insert missing '.' before ';' for English segments.
+        lyrics: Complete lyrics for the song (Markdown formatted).
+        genre: Musical genre (e.g., Rock, Pop, Electronic, Jazz).
+        mood: Overall vibe or emotional state (e.g., Energetic, Melancholic).
+        tempo: BPM (Beats Per Minute), usually between 60 and 180.
+        voice: Vocal type preference: "Male" or "Female".
+        structure: The desired order of song sections.
+        separate_stems: If True, returns separate tracks for vocals and instruments.
 
     Returns:
-        Status string with task id and SG2 notes.
+        A status message containing the Task ID for monitoring.
     """
     request = {
         "lyrics": lyrics,
@@ -253,16 +186,8 @@ async def generate_song(
         "mood": mood,
         "tempo": tempo,
         "voice": voice,
-        "structure": structure or ["Verse", "Chorus"],
+        "structure": structure,
         "separate_stems": separate_stems,
-        "title": title,
-        "model_repo": model_repo,
-        "model_weights": model_weights,
-        "max_length_seconds": max_length_seconds,
-        "torch_dtype": torch_dtype,
-        "style_audio_prompt_path": style_audio_prompt_path,
-        "mix_dual_tracks": mix_dual_tracks,
-        "auto_fix_english_punctuation": auto_fix_english_punctuation,
     }
     return await logic.generate_song(request)
 
@@ -341,11 +266,11 @@ async def diagnostics() -> str:
     """
     return """# songgeneration-mcp Diagnostics
 - **Status:** Operational
-- **Architecture:** FastMCP 3.1+
-- **Backend:** SongGeneration-Studio REST (SG2 payload)
-- **Docs:** `docs/PRD.md`, `docs/LYRIA_VS_SG2.md`; MCP resource `docs://lyria-vs-sg2`
+- **Architecture:** FastMCP SOTA
+- **Backend:** SongGeneration-Studio REST
+- **Local Time:** 2026-01-02
 """
 
 
 if __name__ == "__main__":
-    run_server(app, server_name="songgeneration-mcp")
+    app.run()

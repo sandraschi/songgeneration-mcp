@@ -1,4 +1,5 @@
 """Integration tests for songgeneration_mcp server."""
+
 import pytest
 
 

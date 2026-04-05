@@ -1,1 +1,1 @@
-"""AI-powered song generation server using Tencent AI Lab's LeVo model. Supports lyrics, style control, and stem separation."""
+"""SongGeneration MCP — Tencent SongGeneration v2 (LeVo 2 / SG2) via SongGeneration-Studio."""

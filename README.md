@@ -5,19 +5,19 @@
 Tencent SongGeneration v2 (LeVo 2 / SG2) MCP server via SongGeneration-Studio.
 Supports SG2 structural tags, dual-track output (`vocal.wav` + `inst.wav`), and optional style-cloning prompt audio.
 
-## 🚀 Installation
+##  Installation
 
 ### Prerequisites
 - [uv](https://docs.astral.sh/uv/) installed (RECOMMENDED)
 - Python 3.12+
 
-### 📦 Quick Start
+###  Quick Start
 Run immediately via `uvx`:
 ```bash
 uvx songgeneration-mcp
 ```
 
-### 🎯 Claude Desktop Integration
+###  Claude Desktop Integration
 Add to your `claude_desktop_config.json`:
 ```json
 "mcpServers": {
@@ -35,9 +35,9 @@ python -m songgeneration_mcp.mcp_server
 
 ## Web dashboard (fleet UI)
 
-React + Vite app in **`web_sota/`**: Overview, Tools, Status, App Hub, **Generate**, **Listen**, **Local LLM**, **Chat**, **Logger**, **Help** (tabbed deep docs), Settings. Ports **10884** (frontend) / **10885** (MCP HTTP) — run `web_sota\start.ps1`. Short guide: [web_sota/README.md](web_sota/README.md); route map: [web_sota/docs/PAGES.md](web_sota/docs/PAGES.md).
+React + Vite app in **`web_sota/`**: Overview, Tools, Status, App Hub, **Generate**, **Listen**, **Local LLM**, **Chat**, **Logger**, **Help** (tabbed deep docs), Settings. Ports **10884** (frontend) / **10885** (MCP HTTP)  run `web_sota\start.ps1`. Short guide: [web_sota/README.md](web_sota/README.md); route map: [web_sota/docs/PAGES.md](web_sota/docs/PAGES.md).
 
-**Logs:** The dashboard reads **`GET /api/logs`** — a real in-process ring buffer of Python `logging` output (size `SONGGEN_LOG_BUFFER_LINES`, default 500). `POST /api/logs/clear` clears that buffer. This does not include SongGeneration-Studio logs unless you forward them into this process.
+**Logs:** The dashboard reads **`GET /api/logs`**  a real in-process ring buffer of Python `logging` output (size `SONGGEN_LOG_BUFFER_LINES`, default 500). `POST /api/logs/clear` clears that buffer. This does not include SongGeneration-Studio logs unless you forward them into this process.
 
 ## Studio target (local-first, cloud-capable)
 
@@ -51,6 +51,10 @@ React + Vite app in **`web_sota/`**: Overview, Tools, Status, App Hub, **Generat
 - Web settings and API:
   - `GET/POST /api/settings` includes `studio_url` and `plex_export_dir`
   - `GET /api/studio/info` exposes Studio URL + reachability + direct UI link.
+- Auto-start behavior (local default):
+  - backend attempts to auto-start Studio for local URLs before status/generate calls.
+  - `web_sota\start.ps1` also auto-launches Studio from `D:\Dev\repos\external\SongGeneration-Studio` (override with `SONGGEN_STUDIO_DIR`).
+  - disable backend auto-start with `SONGGEN_STUDIO_AUTO_START=0`.
 
 ## Local media storage and Plex export
 
@@ -102,7 +106,7 @@ Additional tool args now supported:
 
 Server resource:
 - `sg2://structural-tags` for quick SG2 tag/output reference.
-- `docs://lyria-vs-sg2` — **LeVo 2 (SG2)** vs **Gemini Lyria 3 Pro** (pricing fit, local vs cloud).
+- `docs://lyria-vs-sg2`  **LeVo 2 (SG2)** vs **Gemini Lyria 3 Pro** (pricing fit, local vs cloud).
 
 ## Landscape: SG2 vs Gemini Lyria 3 Pro (~March 2026)
 
@@ -112,7 +116,7 @@ Server resource:
 | **Cost** | Hardware + electricity; no per-song cloud fee | Often **~$0.08 per song** in typical Gemini credit economics (**verify** in-app) |
 | **Sweet spot** | **Classical**, **rubato**, **instrumental** nuance; SG2 length tags | Fast iteration, polish, **Google AI** ecosystem integration |
 
-**Takeaway:** Lyria is a bargain for shipped demos; SG2 is the open-weight, section-precise option when you want **sovereignty** or non–US-default musical priors—without dismissing Google’s AI push (many teams use **both**).
+**Takeaway:** Lyria is a bargain for shipped demos; SG2 is the open-weight, section-precise option when you want **sovereignty** or nonUS-default musical priorswithout dismissing Googles AI push (many teams use **both**).
 
 More detail: `docs/LYRIA_VS_SG2.md`, `docs/PRD.md`, or MCP `help(topic="lyria")`.
 
