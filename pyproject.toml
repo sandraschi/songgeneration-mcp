@@ -13,6 +13,7 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "ruff>=0.15.2",
     "imageio-ffmpeg>=0.6.0",
+    "prefab-ui>=0.14.0",
 ]
 
 [project.optional-dependencies]
