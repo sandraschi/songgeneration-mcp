@@ -1,5 +1,7 @@
 # SonggenerationMcp
 
+[![FastMCP Version](https://img.shields.io/badge/FastMCP-3.1.0-blue?style=flat-square&logo=python&logoColor=white)](https://github.com/sandraschi/fastmcp) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Linted with Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Built with Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just)
+
 **Repository:** [github.com/sandraschi/songgeneration-mcp](https://github.com/sandraschi/songgeneration-mcp)
 
 Tencent SongGeneration v2 (LeVo 2 / SG2) MCP server via SongGeneration-Studio.
@@ -10,6 +12,14 @@ Supports SG2 structural tags, dual-track output (`vocal.wav` + `inst.wav`), and 
 ### Prerequisites
 - [uv](https://docs.astral.sh/uv/) installed (RECOMMENDED)
 - Python 3.12+
+
+### SongGeneration-Studio (not in this repo)
+
+**SongGeneration-Studio is a separate project** — it is **not** included when you clone [sandraschi/songgeneration-mcp](https://github.com/sandraschi/songgeneration-mcp). Upstream Studio repo: **[github.com/BazedFrog/SongGeneration-Studio](https://github.com/BazedFrog/SongGeneration-Studio)**. Clone that (or use any checkout whose root has `main.py` for the Studio HTTP server). This MCP repo is only the **control plane**; Studio is the **GPU inference / audio** process (default URL `http://localhost:10930`).
+
+- Point the MCP server at Studio with **`SONGGENERATION_STUDIO_URL`** / **`studio_url`** in settings, or rely on the default.
+- **`web_sota\start.ps1`** and backend auto-start use **`SONGGEN_STUDIO_DIR`** when set; otherwise the default checkout path is **`D:\Dev\repos\external\SongGeneration-Studio`** (clone [SongGeneration-Studio](https://github.com/BazedFrog/SongGeneration-Studio) there, or set the env var to your path).
+- Remote-only: set **`studio_url`** to a Studio instance elsewhere; no local checkout required.
 
 ###  Quick Start
 Run immediately via `uvx`:
@@ -35,7 +45,7 @@ python -m songgeneration_mcp.mcp_server
 
 ## Web dashboard (fleet UI)
 
-React + Vite app in **`web_sota/`**: Overview, Tools, Status, App Hub, **Generate**, **Listen**, **Local LLM**, **Chat**, **Logger**, **Help** (tabbed deep docs), Settings. Ports **10884** (frontend) / **10885** (MCP HTTP)  run `web_sota\start.ps1`. Short guide: [web_sota/README.md](web_sota/README.md); route map: [web_sota/docs/PAGES.md](web_sota/docs/PAGES.md).
+React + Vite app in **`web_sota/`**: Home, Tools, Status, App Hub, **Generate**, **Listen**, **Local LLM**, **Chat**, **Logger**, **Help** (tabbed deep docs), Settings. Ports **10884** (frontend) / **10885** (MCP HTTP)  run `web_sota\start.ps1`. Short guide: [web_sota/README.md](web_sota/README.md); route map: [web_sota/docs/PAGES.md](web_sota/docs/PAGES.md).
 
 **Logs:** The dashboard reads **`GET /api/logs`**  a real in-process ring buffer of Python `logging` output (size `SONGGEN_LOG_BUFFER_LINES`, default 500). `POST /api/logs/clear` clears that buffer. This does not include SongGeneration-Studio logs unless you forward them into this process.
 
@@ -52,9 +62,8 @@ React + Vite app in **`web_sota/`**: Overview, Tools, Status, App Hub, **Generat
   - `GET/POST /api/settings` includes `studio_url` and `plex_export_dir`
   - `GET /api/studio/info` exposes Studio URL + reachability + direct UI link.
 - Auto-start behavior (local default):
-  - backend attempts to auto-start Studio for local URLs before status/generate calls.
-  - `web_sota\start.ps1` also auto-launches Studio from `D:\Dev\repos\external\SongGeneration-Studio` (override with `SONGGEN_STUDIO_DIR`).
-  - disable backend auto-start with `SONGGEN_STUDIO_AUTO_START=0`.
+  - The MCP backend can auto-start Studio for local URLs via **`uv run --directory <studio> python main.py …`** when `uv` is on `PATH` (disable with `SONGGEN_STUDIO_AUTO_START=0`). If `uv` is missing, it falls back to `SONGGEN_STUDIO_PYTHON`, then `python`, then `py -3`.
+  - **`web_sota\start.ps1`** starts SongGeneration-Studio the same way (if nothing is already listening on **10930** and `main.py` exists under `SONGGEN_STUDIO_DIR` / default `D:\Dev\repos\external\SongGeneration-Studio`). Remote-only setups: point `studio_url` at your Studio host and skip local Studio.
 
 ## Local media storage and Plex export
 
@@ -151,6 +160,17 @@ ruff check .
 # Format
 ruff format .
 ```
+
+
+## 🛡️ Industrial Quality Stack
+
+This project adheres to **SOTA 14.1** industrial standards for high-fidelity agentic orchestration:
+
+- **Python (Core)**: [Ruff](https://astral.sh/ruff) for linting and formatting. Zero-tolerance for `print` statements in core handlers (`T201`).
+- **Webapp (UI)**: [Biome](https://biomejs.dev/) for sub-millisecond linting. Strict `noConsoleLog` enforcement.
+- **Protocol Compliance**: Hardened `stdout/stderr` isolation to ensure crash-resistant JSON-RPC communication.
+- **Automation**: [Justfile](./justfile) recipes for all fleet operations (`just lint`, `just fix`, `just dev`).
+- **Security**: Automated audits via `bandit` and `safety`.
 
 ## License
 

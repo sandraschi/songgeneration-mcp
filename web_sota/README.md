@@ -10,13 +10,15 @@ From `web_sota`:
 .\start.ps1
 ```
 
-Or manually: `npm install` then `npm run dev -- --port 10884 --host 127.0.0.1`, and run the Python backend from repo root as in `start.ps1`.
+**SongGeneration-Studio** is a **different repository** than `songgeneration-mcp` — clone **[github.com/BazedFrog/SongGeneration-Studio](https://github.com/BazedFrog/SongGeneration-Studio)** (see root [README](../README.md) § *SongGeneration-Studio (not in this repo)*). Documented default path: **`D:\Dev\repos\external\SongGeneration-Studio`** (matches `SONGGEN_STUDIO_DIR` / `start.ps1` when unset). Use a remote Studio URL in Settings if you do not run Studio locally.
+
+Or manually: `npm install` then `npm run dev -- --port 10884 --host 127.0.0.1`, and from repo root run the same uvicorn line as in `start.ps1`. For local inference, Studio must listen on **10930** unless you change the URL — `start.ps1` tries to launch it with `uv run --directory <studio> python main.py …` when `main.py` exists under that directory.
 
 ## Pages (standard)
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Overview |
+| `/` | Home |
 | `/tools` | MCP tools summary |
 | `/status` | Health-style panel |
 | `/apps` | App hub |

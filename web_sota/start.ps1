@@ -1,9 +1,19 @@
-﻿# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
+﻿Param([switch]$Headless)
+
+# --- SOTA Headless Standard ---
+if ($Headless -and ($Host.UI.RawUI.WindowTitle -notmatch 'Hidden')) {
+    Start-Process pwsh -ArgumentList '-NoProfile', '-File', $PSCommandPath, '-Headless' -WindowStyle Hidden
+    exit
+}
+$WindowStyle = if ($Headless) { 'Hidden' } else { 'Normal' }
+# ------------------------------
+
+# Webapp Start - Standardized SOTA (Auto-Repaired V2.5)
 $WebPort = 10884
 $BackendPort = 10885
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
 $StudioPort = 10930
 $StudioDir = if ($env:SONGGEN_STUDIO_DIR) { $env:SONGGEN_STUDIO_DIR } else { "D:\Dev\repos\external\SongGeneration-Studio" }
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
 
 # 1. Kill any process squatting on the ports
 Write-Host "Checking for port squatters on $WebPort and $BackendPort..." -ForegroundColor Yellow
@@ -13,31 +23,60 @@ foreach ($p in $pids) {
     try { Stop-Process -Id $p -Force -ErrorAction Stop } catch { Write-Host "Warning: Could not terminate PID $p." -ForegroundColor Gray }
 }
 
-# 1b. Ensure SongGeneration-Studio is running (local default)
-$studioListener = Get-NetTCPConnection -LocalPort $StudioPort -State Listen -ErrorAction SilentlyContinue
-if (-not $studioListener) {
-    $studioMain = Join-Path $StudioDir "main.py"
-    if (Test-Path $studioMain) {
-        Write-Host "Starting SongGeneration-Studio on port $StudioPort ..." -ForegroundColor Cyan
-        $studioCmd = "Set-Location '$StudioDir'; python main.py --host 127.0.0.1 --port $StudioPort"
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", $studioCmd -WindowStyle Normal
-        Start-Sleep -Seconds 2
-    } else {
-        Write-Host "SongGeneration-Studio not found at $StudioDir (set SONGGEN_STUDIO_DIR)." -ForegroundColor Yellow
-    }
-}
-
 # 2. Setup
 Set-Location $PSScriptRoot
 if (-not (Test-Path "node_modules")) { npm install }
 
-# 3. Start the Python backend (Background)
+# 2b. SongGeneration-Studio (GPU inference) — required for generation; same `uv` toolchain as this repo
+$studioListener = Get-NetTCPConnection -LocalPort $StudioPort -State Listen -ErrorAction SilentlyContinue
+if (-not $studioListener) {
+    $studioMain = Join-Path $StudioDir "main.py"
+    if (Test-Path $studioMain) {
+        Write-Host "Starting SongGeneration-Studio on port $StudioPort (uv run) ..." -ForegroundColor Cyan
+        $studioCmd = "uv run --directory '$StudioDir' python main.py --host 127.0.0.1 --port $StudioPort"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", $studioCmd -WindowStyle Normal
+        $sw = 0
+        while ($sw -lt 90) {
+            Start-Sleep -Seconds 1
+            if (Get-NetTCPConnection -LocalPort $StudioPort -State Listen -ErrorAction SilentlyContinue) { break }
+            $sw++
+        }
+    } else {
+        Write-Host "SongGeneration-Studio not found at $StudioDir — set SONGGEN_STUDIO_DIR or clone Studio; generation will fail until Studio is up." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "SongGeneration-Studio already listening on port $StudioPort." -ForegroundColor Green
+}
+
+# 3. Start the Python backend (Background) from project root — same pattern as other fleet MCP web_sota servers
 Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
-
-# Use TRIPLE backtick to ensure $env:PYTHONPATH reaches the REAL shell
-$backendCmd = "`$env:PYTHONPATH = '$ProjectRoot\src'; Set-Location '$ProjectRoot'; uv run uvicorn songgeneration_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
-
+$backendCmd = "`$env:PYTHONPATH = '$ProjectRoot\src'; Set-Location '$ProjectRoot'; uv run --project '$ProjectRoot' uvicorn songgeneration_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
+
+# 3b. Wait until the API actually serves HTTP (TCP Listen alone can race or false-positive; Vite proxies need a real response)
+$healthUrl = "http://127.0.0.1:$BackendPort/api/health"
+$maxAttempts = 40
+$attempt = 0
+$backendUp = $false
+Start-Sleep -Seconds 1
+while ($attempt -lt $maxAttempts) {
+    try {
+        $r = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        if ($r.StatusCode -eq 200) {
+            $backendUp = $true
+            break
+        }
+    } catch {
+        # connection refused / still starting
+    }
+    Start-Sleep -Seconds 2
+    $attempt++
+}
+if ($backendUp) {
+    Write-Host "Backend (port $BackendPort) answered GET /api/health — ready for Vite proxy." -ForegroundColor Green
+} else {
+    Write-Host "Backend (port $BackendPort) did not return HTTP 200 from /api/health after $($maxAttempts * 2)s. Open the uvicorn PowerShell window for errors." -ForegroundColor Yellow
+}
 
 # 4. Run server (Vite dev)
 Write-Host "Starting Vite frontend on port $WebPort ..." -ForegroundColor Green
@@ -49,6 +88,5 @@ Start-Process powershell -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "
 
 Write-Host "Browser will open automatically when Vite is ready." -ForegroundColor Gray
 npm run dev -- --port $WebPort --host
-
 
 

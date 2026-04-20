@@ -26,7 +26,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const location = useLocation();
 
     const navItems = [
-        { href: '/', label: 'Overview', icon: LayoutDashboard },
+        { href: '/', label: 'Home', icon: LayoutDashboard },
         { href: '/generate', label: 'Generate', icon: Music2 },
         { href: '/listen', label: 'Listen', icon: Headphones },
         { href: '/tools', label: 'Tools', icon: Wrench },

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
@@ -44,17 +45,37 @@ def _studio_dir(value: str | None = None) -> Path:
     return Path(raw) if raw else _DEFAULT_STUDIO_DIR
 
 
-def _python_executable() -> str:
-    return (os.getenv("SONGGEN_STUDIO_PYTHON", "") or "").strip() or "python"
-
-
 def _spawn_studio(base_url: str, studio_dir_value: str | None = None) -> bool:
     studio_dir = _studio_dir(studio_dir_value)
     main_py = studio_dir / "main.py"
     if not main_py.is_file():
         return False
     port = _studio_port(base_url)
-    cmd = [_python_executable(), "main.py", "--host", "127.0.0.1", "--port", str(port)]
+    host = "127.0.0.1"
+    uv = shutil.which("uv")
+    if uv:
+        cmd = [
+            uv,
+            "run",
+            "--directory",
+            str(studio_dir),
+            "python",
+            "main.py",
+            "--host",
+            host,
+            "--port",
+            str(port),
+        ]
+    else:
+        custom = (os.getenv("SONGGEN_STUDIO_PYTHON", "") or "").strip()
+        if custom:
+            cmd = [custom, "main.py", "--host", host, "--port", str(port)]
+        elif shutil.which("python"):
+            cmd = ["python", "main.py", "--host", host, "--port", str(port)]
+        elif shutil.which("py"):
+            cmd = ["py", "-3", "main.py", "--host", host, "--port", str(port)]
+        else:
+            return False
     kwargs: dict[str, object] = {
         "cwd": str(studio_dir),
         "stdout": subprocess.DEVNULL,

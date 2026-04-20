@@ -10,6 +10,8 @@ import {
     MessageSquare,
     AlertCircle,
     Music2,
+    Headphones,
+    Settings,
 } from "lucide-react";
 import { fetchHealth, fetchLogs } from "@/lib/api";
 
@@ -49,10 +51,24 @@ export function Dashboard() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-3">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-white">Songgeneration MCP Dashboard</h2>
-                    <p className="text-slate-400">Live data from this repo’s HTTP process (no fake telemetry).</p>
+                    <h2 className="text-2xl font-bold tracking-tight text-white">SongGeneration MCP</h2>
+                    <p className="mt-1 max-w-3xl text-base leading-relaxed text-slate-300">
+                        <strong className="font-semibold text-white">What this is:</strong> a browser dashboard for the{" "}
+                        <span className="text-slate-200">songgeneration-mcp</span> Python server. That server speaks{" "}
+                        <abbr title="Model Context Protocol" className="cursor-help border-b border-dotted border-slate-500">
+                            MCP
+                        </abbr>{" "}
+                        to tools like Claude and exposes REST endpoints this UI calls. Music is rendered by{" "}
+                        <strong className="text-slate-200">SongGeneration-Studio</strong> (GPU, usually{" "}
+                        <code className="text-slate-400">localhost:10930</code>) — not by this page alone.
+                    </p>
+                    <p className="mt-2 max-w-3xl text-sm text-slate-500">
+                        The tiles below only reflect <strong className="text-slate-400">this API process</strong> (health + in-memory
+                        logs). Use <strong className="text-slate-400">Generate</strong> to send jobs to Studio, <strong className="text-slate-400">Listen</strong> for playback,{" "}
+                        <strong className="text-slate-400">Settings</strong> for URLs and export paths.
+                    </p>
                 </div>
             </div>
 
@@ -70,6 +86,20 @@ export function Dashboard() {
                 >
                     <Music2 className="h-4 w-4 text-violet-400" />
                     Generate
+                </Link>
+                <Link
+                    to="/listen"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm text-slate-200 hover:border-violet-500/40 hover:text-white"
+                >
+                    <Headphones className="h-4 w-4 text-violet-400" />
+                    Listen
+                </Link>
+                <Link
+                    to="/settings"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm text-slate-200 hover:border-slate-600 hover:text-white"
+                >
+                    <Settings className="h-4 w-4 text-slate-400" />
+                    Settings
                 </Link>
                 <Link
                     to="/local-llm"
@@ -104,7 +134,7 @@ export function Dashboard() {
             <div className="grid gap-4 md:grid-cols-2">
                 <Card className="border-slate-800 bg-slate-950/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-200">HTTP API</CardTitle>
+                        <CardTitle className="text-sm font-medium text-slate-200">API server</CardTitle>
                         <Shield
                             className={`h-4 w-4 ${healthOk ? "text-emerald-500" : healthOk === false ? "text-red-400" : "text-slate-500"}`}
                         />
@@ -113,18 +143,20 @@ export function Dashboard() {
                         <div className="text-2xl font-bold text-white">
                             {healthOk === null ? "…" : healthOk ? "OK" : "Down"}
                         </div>
-                        <p className="text-xs text-slate-400">{healthDetail || "GET /api/health"}</p>
+                        <p className="text-xs text-slate-400">
+                            {healthDetail || "songgeneration-mcp (GET /api/health)"}
+                        </p>
                     </CardContent>
                 </Card>
 
                 <Card className="border-slate-800 bg-slate-950/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-200">Log buffer</CardTitle>
+                        <CardTitle className="text-sm font-medium text-slate-200">Server logs (buffer)</CardTitle>
                         <Activity className="h-4 w-4 text-slate-400" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">{logCount === null ? "…" : logCount}</div>
-                        <p className="text-xs text-slate-400">Lines in process ring buffer (SONGGEN_LOG_BUFFER_LINES)</p>
+                        <p className="text-xs text-slate-400">Recent lines kept in memory (env SONGGEN_LOG_BUFFER_LINES)</p>
                     </CardContent>
                 </Card>
             </div>
@@ -146,13 +178,26 @@ export function Dashboard() {
                 </Card>
                 <Card className="col-span-3 border-slate-800 bg-slate-950/50">
                     <CardHeader>
-                        <CardTitle className="text-white">Scope</CardTitle>
+                        <CardTitle className="text-white">What this page does not show</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-sm text-slate-400">
-                            SongGeneration-Studio GPU inference is a <strong className="text-slate-300">separate</strong> process. This UI
-                            reflects only the MCP HTTP server and Python <code className="text-slate-500">logging</code> buffer.
-                        </p>
+                        <ul className="list-inside list-disc space-y-2 text-sm text-slate-400">
+                            <li>
+                                <strong className="text-slate-300">GPU / Studio</strong> — reachability is surfaced on{" "}
+                                <Link to="/generate" className="text-violet-400 underline-offset-2 hover:underline">
+                                    Generate
+                                </Link>
+                                ; set the Studio URL under{" "}
+                                <Link to="/settings" className="text-violet-400 underline-offset-2 hover:underline">
+                                    Settings
+                                </Link>
+                                .
+                            </li>
+                            <li>
+                                <strong className="text-slate-300">These log lines</strong> — only this MCP process; Studio prints to its
+                                own window unless you forward logs.
+                            </li>
+                        </ul>
                     </CardContent>
                 </Card>
             </div>

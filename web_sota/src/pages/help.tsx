@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Book, Layers, Scale, Terminal, Boxes } from "lucide-react";
+import { Book, Layers, Scale, Terminal, Boxes, Package } from "lucide-react";
 
 export function Help() {
   return (
@@ -20,9 +20,44 @@ export function Help() {
           </div>
           <CardDescription className="text-slate-400">
             Run <code className="text-slate-300">web_sota/start.ps1</code> — Vite on <strong>10884</strong>, MCP HTTP on{" "}
-            <strong>10885</strong>. Point SongGeneration-Studio at your GPU; this UI does not replace Studio inference.
+            <strong>10885</strong>. This dashboard does not run GPU inference by itself.
           </CardDescription>
         </CardHeader>
+      </Card>
+
+      <Card className="border-slate-800 bg-slate-950/50">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-amber-400" />
+            <CardTitle className="text-lg text-white">SongGeneration-Studio (separate repo)</CardTitle>
+          </div>
+          <CardDescription className="text-slate-400">
+            The inference server is <strong className="text-slate-200">not</strong> part of the <code className="text-slate-300">songgeneration-mcp</code>{" "}
+            Git repository. Clone or copy that project yourself so you have a directory containing <code className="text-slate-300">main.py</code> (HTTP API + GPU).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-slate-300">
+          <p>
+            Default local checkout on this fleet layout:{" "}
+            <code className="text-slate-400">D:/Dev/repos/external/SongGeneration-Studio</code>. Override with{" "}
+            <strong className="text-white">SONGGEN_STUDIO_DIR</strong> if yours differs, or set <strong className="text-white">studio_url</strong>{" "}
+            under Settings when Studio runs elsewhere. Default Studio URL is{" "}
+            <code className="text-slate-400">http://localhost:10930</code>.
+          </p>
+          <p>
+            <a
+              href="https://github.com/BazedFrog/SongGeneration-Studio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-violet-400 underline-offset-2 hover:underline"
+            >
+              github.com/BazedFrog/SongGeneration-Studio
+            </a>
+          </p>
+          <p className="text-slate-500">
+            More context: root <code className="text-slate-400">README.md</code> § <em>SongGeneration-Studio (not in this repo)</em>.
+          </p>
+        </CardContent>
       </Card>
 
       <Tabs defaultValue="sg2" className="w-full">
@@ -144,6 +179,10 @@ export function Help() {
               <ul className="space-y-2 font-mono text-xs text-slate-400">
                 <li>
                   <span className="text-emerald-300">SONGGENERATION_STUDIO_URL</span> — Studio API base
+                </li>
+                <li>
+                  <span className="text-emerald-300">SONGGEN_STUDIO_DIR</span> — filesystem path to your <strong className="text-slate-300">separate</strong> Studio
+                  checkout (used by <code className="text-slate-400">start.ps1</code> and auto-start)
                 </li>
                 <li>
                   <span className="text-emerald-300">SONGGEN_MODEL_REPO</span> / <span className="text-emerald-300">SONGGEN_MODEL_WEIGHTS</span>

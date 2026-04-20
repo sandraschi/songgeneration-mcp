@@ -2,9 +2,9 @@
 
 All routes use the shared `AppLayout` (sidebar + top bar).
 
-## Overview (`/`)
+## Home (`/`)
 
-KPI cards and a compact log preview. Quick links to **Local LLM**, **Chat**, **Logger**, **Help**.
+Plain-language intro (what MCP vs Studio are), API health + compact log preview, quick links (Generate, Listen, Settings, etc.).
 
 ## Tools (`/tools`)
 
