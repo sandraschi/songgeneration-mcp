@@ -7,6 +7,9 @@
   <a href="https://github.com/PrefectHQ/fastmcp"><img src="https://img.shields.io/badge/FastMCP-3.2-7c5cfc?style=flat-square" alt="FastMCP"></a>
 </p>
 
+
+> 📖 **[Installation Guide](INSTALL.md)** — quick start, manual setup, and troubleshooting
+
 **Repository:** [github.com/sandraschi/songgeneration-mcp](https://github.com/sandraschi/songgeneration-mcp)
 
 MCP server for **Tencent SongGeneration v2 (LeVo 2 / SG2)** via [SongGeneration-Studio](https://github.com/BazedFrog/SongGeneration-Studio). Local open-weight music generation: SG2 structural length tags, dual-track output (`vocal.wav` + `inst.wav`), optional style-clone from a reference audio clip.
