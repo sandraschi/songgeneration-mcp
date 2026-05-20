@@ -196,51 +196,22 @@ generation on that reference clip's timbre and production style.
 `help(topic="lyria")` or resource `docs://lyria-vs-sg2`
 """
     else:
-        return """\
-# songgeneration-mcp — Advanced Help
+        return """# songgeneration-mcp - Advanced Help
 
-## Under the hood
+## Under the Hood
+Bridges to SongGeneration-Studio REST. Payloads include an `sg2` block (repo, v2-large,
+max_length_seconds=270, torch_dtype=bfloat16, dual tracks, optional style_rag).
+Resource `sg2://structural-tags` lists SG2 length markers.
 
-The MCP server wraps SongGeneration-Studio's REST API. `generate_song` builds an `sg2` payload
-(model_repo, model_weights, max_length_seconds, torch_dtype, dual_track, optional style_rag)
-and POSTs to Studio's `/api/generate`. Studio manages the model-server subprocess and GPU queue.
+## SG2 vs Gemini Lyria 3 Pro (March 2026)
+- **Lyria 3 Pro**: Cloud + Gemini; **low $/track** (~**$0.08/song** in many tiers—**verify**).
+  Strong fit for fast iteration and Google's AI roadmap.
+- **LeVo 2 / SG2**: **Local** open-weight path; upfront GPU; no per-song cloud meter.
+  Often stronger for **classical**, **rubato**, and **instrumental** articulation; SG2 length tags
+  reduce generic section timing. Useful **counterweight** to **US-centric** commercial defaults—
+  not a knock on Google's push (many teams use **both**).
 
-Generation produces discrete codec tokens for two streams (vocal, instrumental), decoded to
-48 kHz stereo WAVs. The dual-track output is not post-hoc separation — it is the model's native
-output, so stems are phase-coherent with the mix.
-
-## SG2 architecture
-- Transformer over discrete audio codec tokens (not diffusion)
-- Conditioned on: lyrics (text tokens), genre/mood/BPM embeddings, voice tag, optional style audio
-- Length tags in lyrics give per-section duration priors to the model
-- v2-large: ~22 GB VRAM in bfloat16; v2-medium available for lower-VRAM setups
-
-## SG2 vs Gemini Lyria 3 Pro (technical)
-
-| | SG2 / LeVo 2 | Gemini Lyria 3 Pro |
-| --- | --- | --- |
-| Architecture | Discrete-codec transformer | Diffusion-based |
-| Weights | Open (Hugging Face) | Closed, cloud-only |
-| Stems | vocal.wav + inst.wav native | Single mix |
-| Section control | Length tags in lyrics | Prompt wording only |
-| Training priors | Tencent catalog, C-pop | Google-licensed, Western pop/rock |
-| Cost model | Hardware + electricity | ~$0.08/track cloud (verify) |
-| VRAM | ~22 GB (v2-large bfloat16) | None (cloud) |
-
-## API endpoints (Starlette ASGI, port 10885)
-- GET  /api/health
-- GET  /api/studio/status — Studio reachability + generation queue
-- GET  /api/studio/test  — deep check: dir, HTTP, GPU, model-server, models
-- GET  /api/studio/info
-- POST /api/generate
-- GET  /api/songs  ·  GET /api/songs/{repo_id}
-- GET/POST /api/settings
-- POST /api/export/plex  ·  /api/export/virtualdj  ·  /api/export/reaper
-- GET  /api/export/virtualdj/status
-- GET  /api/media/{file_path:path}
-- *    /mcp  — MCP streamable-HTTP transport
-
-Full doc: resource `docs://lyria-vs-sg2`, file `docs/LYRIA_VS_SG2.md`
+Full write-up: resource `docs://lyria-vs-sg2` or `help(topic="lyria")`.
 """
 
 

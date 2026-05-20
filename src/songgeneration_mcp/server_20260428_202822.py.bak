@@ -618,7 +618,6 @@ app = Starlette(
         Route("/api/logs", api_logs_get, methods=["GET"]),
         Route("/api/logs/clear", api_logs_clear, methods=["POST"]),
         Route("/api/studio/status", api_studio_status, methods=["GET"]),
-        Route("/api/studio/test", api_studio_test, methods=["GET"]),
         Route("/api/studio/info", api_studio_info, methods=["GET"]),
         Route("/api/generate", api_generate_post, methods=["POST"]),
         Route("/api/songs", api_songs_list, methods=["GET"]),

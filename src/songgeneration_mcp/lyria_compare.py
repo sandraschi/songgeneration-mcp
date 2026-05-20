@@ -1,51 +1,58 @@
-"""LeVo 2 (SG2) vs Gemini Lyria 3 Pro — text for MCP resource and help."""
+"""LeVo 2 (SG2) vs Gemini Lyria 3 Pro — text for MCP resource and help.
+
+The canonical comparison doc lives at ``docs/LYRIA_VS_SG2.md``.
+``get_lyria_vs_sg2_text()`` reads that file when running from the repo;
+the constant below is a trimmed fallback for installed-wheel deployments.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-# Canonical copy for wheels / installed packages (repo `docs/LYRIA_VS_SG2.md` should match).
-LYRIA_VS_SG2_MARKDOWN = "\n".join(
-    [
-        "# LeVo 2 (SG2) vs Gemini Lyria 3 Pro",
-        "",
-        "This note is for **product and creative context**—not a benchmark suite. "
-        "Pricing and SKUs change; always confirm **current** Google in-app and API terms.",
-        "",
-        "## TL;DR",
-        "",
-        "- **Gemini Lyria 3 Pro** (2026): Cloud music generation inside Google's AI push—often "
-        "**very affordable per track** (many users see on the order of **~$0.08 per song** in "
-        "typical Gemini credit economics; **verify live pricing**). Great when you want speed, "
-        "polish, and tight Gemini integration.",
-        "- **SongGeneration v2 / LeVo 2 (SG2)**: **Open-weight**, **local** inference via "
-        "SongGeneration-Studio—**no per-song cloud meter**. Strong where **classical phrasing**, "
-        "**rubato**, and **instrumental** nuance matter; SG2's **length-tagged** sections help "
-        "long-form structure.",
-        "",
-        "## Why both matter",
-        "",
-        "Commercial US-led music APIs have shaped default \"radio\" aesthetics worldwide. "
-        "A **Chinese research champion** in open music LM space is a useful **counterweight**: "
-        "different priors, more room for **non–Top-40** idioms, and **on-prem** control. "
-        "That does **not** negate the value of Google's ecosystem—many of us **like** the "
-        "Google AI push **and** still run local models for sovereignty, repertoire, or scoring.",
-        "",
-        "## When to pick which",
-        "",
-        "| Prefer Lyria 3 Pro | Prefer SG2 (this stack) |",
-        "| --- | --- |",
-        "| You live in Gemini all day | You want **weights on disk** / air-gapped |",
-        "| Optimize $/track (cloud) | Optimize **repetition** + **fine section control** |",
-        "| You need instant share-to-YouTube loops | You need **orchestral** / **classical** "
-        "articulation experiments |",
-        "",
-    ]
-)
+# Trimmed fallback for installed-wheel deployments (repo docs/LYRIA_VS_SG2.md is authoritative).
+LYRIA_VS_SG2_MARKDOWN = """\
+# LeVo 2 (SG2) vs Gemini Lyria 3 Pro
+
+*Pricing and model SKUs change — always verify current Google terms.*
+
+## TL;DR
+
+- **Gemini Lyria 3 Pro** (2026): Cloud music generation, Google ecosystem, fast iteration.
+  Often ~$0.08/track in typical Gemini credits (**verify live pricing**). Best for rapid sketches
+  and mainstream Western pop/rock/electronic.
+- **SongGeneration v2 / LeVo 2 (SG2)**: Open-weight, local inference via SongGeneration-Studio.
+  No per-song cloud meter. Dual-track output (vocal.wav + inst.wav) at generation time.
+  Strong for classical phrasing, rubato, orchestral articulation, and long-form structural control
+  via SG2 length tags.
+
+## Key differences
+
+| | SG2 / LeVo 2 | Gemini Lyria 3 Pro |
+| --- | --- | --- |
+| **Weights** | Open (Hugging Face) | Closed, cloud-only |
+| **Cost model** | Hardware + electricity | Per-generation cloud credits |
+| **Stems** | vocal.wav + inst.wav native | Single mix (no native stems) |
+| **Section control** | Length tags in lyrics | Prompt wording only |
+| **Training priors** | Tencent catalog, C-pop | Google-licensed, Western pop/rock |
+| **Latency** | 2–10 min (RTX 4090) | Seconds to ~2 min (cloud) |
+| **VRAM** | ~22 GB (v2-large, bfloat16) | None (cloud) |
+
+## When to pick which
+
+Prefer SG2 when you need stems, structural timing control, non-Western priors, on-prem
+sovereignty, or style-clone from a reference clip (style_audio_prompt_path).
+
+Prefer Lyria 3 Pro when you need fast iteration, mainstream Western polish, or Gemini
+ecosystem integration without a local GPU.
+
+Many workflows use both: Lyria for rapid concept sketches, SG2 for final long-form renders.
+
+Full doc: docs/LYRIA_VS_SG2.md in the repo, or MCP resource docs://lyria-vs-sg2.
+"""
 
 
 def get_lyria_vs_sg2_text() -> str:
-    """Return comparison doc: prefer repo `docs/LYRIA_VS_SG2.md` when running from source."""
+    """Return comparison doc: prefer repo ``docs/LYRIA_VS_SG2.md`` when running from source."""
     here = Path(__file__).resolve()
     repo_docs = here.parent.parent.parent / "docs" / "LYRIA_VS_SG2.md"
     if repo_docs.is_file():

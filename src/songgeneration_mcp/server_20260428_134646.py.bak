@@ -78,106 +78,6 @@ async def api_studio_status(_request: Request) -> JSONResponse:
     return JSONResponse(data)
 
 
-async def api_studio_test(_request: Request) -> JSONResponse:
-    """Deep connectivity test: checks Studio process, HTTP reachability, GPU, and model-server."""
-    import os
-    from pathlib import Path as _Path
-
-    settings = load_settings()
-    studio_url = _logic.base_url
-    studio_dir = settings.get("studio_dir") or os.getenv("SONGGEN_STUDIO_DIR", "")
-
-    checks: list[dict] = []
-
-    # 1. Directory exists and has main.py
-    dir_ok = False
-    if studio_dir:
-        main_py = _Path(studio_dir) / "main.py"
-        dir_ok = main_py.is_file()
-    checks.append({
-        "name": "studio_dir",
-        "ok": dir_ok,
-        "detail": studio_dir if studio_dir else "not configured",
-    })
-
-    # 2. HTTP reachable — /api/health
-    import httpx as _httpx
-    health_ok = False
-    health_detail = ""
-    try:
-        async with _httpx.AsyncClient(timeout=4.0) as c:
-            r = await c.get(f"{studio_url}/api/health")
-            health_ok = r.status_code == 200
-            health_detail = f"HTTP {r.status_code}"
-    except Exception as exc:
-        health_detail = str(exc)
-    checks.append({"name": "http_reachable", "ok": health_ok, "detail": health_detail})
-
-    # 3. GPU info
-    gpu_ok = False
-    gpu_detail = ""
-    if health_ok:
-        try:
-            async with _httpx.AsyncClient(timeout=4.0) as c:
-                r = await c.get(f"{studio_url}/api/gpu")
-                if r.status_code == 200:
-                    gd = r.json()
-                    gpu_ok = gd.get("available", False)
-                    if gpu_ok:
-                        g = gd.get("gpu", {})
-                        gpu_detail = (
-                            f"{g.get('name','?')} — "
-                            f"{g.get('free_gb','?')} GB free / {g.get('total_gb','?')} GB total"
-                        )
-                    else:
-                        gpu_detail = gd.get("error") or "GPU not available"
-        except Exception as exc:
-            gpu_detail = str(exc)
-    checks.append({"name": "gpu", "ok": gpu_ok, "detail": gpu_detail})
-
-    # 4. Model server process
-    ms_ok = False
-    ms_detail = ""
-    if health_ok:
-        try:
-            async with _httpx.AsyncClient(timeout=4.0) as c:
-                r = await c.get(f"{studio_url}/api/model-server/status")
-                if r.status_code == 200:
-                    ms = r.json()
-                    ms_ok = ms.get("running", False)
-                    if ms_ok:
-                        loaded = ms.get("model_id") if ms.get("loaded") else None
-                        ms_detail = f"running — model: {loaded or 'none loaded'}"
-                    else:
-                        ms_detail = ms.get("error") or "not running"
-        except Exception as exc:
-            ms_detail = str(exc)
-    checks.append({"name": "model_server", "ok": ms_ok, "detail": ms_detail})
-
-    # 5. At least one model ready
-    model_ok = False
-    model_detail = ""
-    if health_ok:
-        try:
-            async with _httpx.AsyncClient(timeout=4.0) as c:
-                r = await c.get(f"{studio_url}/api/models")
-                if r.status_code == 200:
-                    md = r.json()
-                    ready = [m["id"] for m in md.get("models", []) if m.get("status") == "ready"]
-                    model_ok = len(ready) > 0
-                    model_detail = ", ".join(ready) if ready else "no models downloaded"
-        except Exception as exc:
-            model_detail = str(exc)
-    checks.append({"name": "models_ready", "ok": model_ok, "detail": model_detail})
-
-    overall = all(c["ok"] for c in checks)
-    return JSONResponse({
-        "ok": overall,
-        "studio_url": studio_url,
-        "checks": checks,
-    })
-
-
 async def api_studio_info(_request: Request) -> JSONResponse:
     settings = load_settings()
     reachable = await ensure_studio_available(
@@ -618,7 +518,6 @@ app = Starlette(
         Route("/api/logs", api_logs_get, methods=["GET"]),
         Route("/api/logs/clear", api_logs_clear, methods=["POST"]),
         Route("/api/studio/status", api_studio_status, methods=["GET"]),
-        Route("/api/studio/test", api_studio_test, methods=["GET"]),
         Route("/api/studio/info", api_studio_info, methods=["GET"]),
         Route("/api/generate", api_generate_post, methods=["POST"]),
         Route("/api/songs", api_songs_list, methods=["GET"]),

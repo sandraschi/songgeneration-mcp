@@ -137,110 +137,56 @@ async def help(level: str = "basic", topic: str | None = None) -> str:
         return get_lyria_vs_sg2_text()
 
     if level == "basic":
-        return """\
-# songgeneration-mcp
+        return """# songgeneration-mcp Help
 
-Tencent SongGeneration v2 (LeVo 2 / SG2) via SongGeneration-Studio — local open-weight music generation.
+## Overview
+Tencent SongGeneration v2 (LeVo 2, open weights) via SongGeneration-Studio.
+SG2 length tags, dual-track output (vocal.wav / inst.wav), optional style audio prompt.
 
-## Tools
-- `generate_song` — generate a song from lyrics + style parameters
-- `list_models` — list models available in Studio
-- `get_status` — GPU VRAM and generation queue state
-- `cancel_generation` — stop an active task
-- `unload_models` — free VRAM
-- `diagnostics` — server diagnostic report
-- `help` — this help (level="basic"|"intermediate"|"advanced", topic="lyria")
+**Landscape:** **Gemini Lyria 3 Pro** (~Mar 2026) is often ~**$0.08/track** in Gemini (**verify**).
+This stack is **local**—strong for **classical**, **rubato**, and **instrumental** nuance.
+See `docs://lyria-vs-sg2` or `help(topic="lyria")`.
 
-## Key facts
-- Dual-track output: `vocal.wav` + `inst.wav` at 48 kHz (native codec stems, not post-hoc separation)
-- Section timing: embed SG2 length tags in lyrics — `[intro-short]`, `[inst-medium]`, `[outro-long]`, etc.
-- Style cloning: pass a ~10s WAV path as `style_audio_prompt_path`
-- Studio must be running locally (port 10930) or configured via `studio_url`
-
-## vs Gemini Lyria 3 Pro
-SG2 is local/open-weight with native stems and structural length tags.
-Lyria 3 Pro is cloud-only, faster, no stems natively, ~$0.08/track (verify).
-See `help(topic="lyria")` or MCP resource `docs://lyria-vs-sg2` for the full comparison.
+## Available Tools
+- list_models: Show available generation models
+- generate_song: Create a new song with lyrics and style
+- get_status: Monitor VRAM and active generation tasks
+- cancel_generation: Stop an active generation task
+- unload_models: Free GPU memory
+- diagnostics: Get server diagnostic information
+- help: Show this help message
 """
     elif level == "intermediate":
-        return """\
-# songgeneration-mcp — Intermediate Help
+        return """# songgeneration-mcp - Intermediate Help
 
-## Generation workflow
-1. `list_models` — confirm what's loaded in Studio
-2. `generate_song(lyrics=..., genre=..., mood=...)` — start generation
-3. `get_status` — monitor VRAM and queue
-4. `unload_models` — free VRAM when done
+## generation Workflow
+1. Use `list_models` to see what models are loaded.
+2. Call `generate_song` with your lyrics and style parameters.
+3. Monitor progress with `get_status`.
+4. If you're done, use `unload_models` to save VRAM for other processes.
 
-## Lyrics format (SG2)
-Use `;` as section separator. Embed length tags for timing control:
-  `[intro-short]` (0–10s) · `[intro-medium]` (10–20s)
-  `[inst-short]` · `[inst-medium]`
-  `[outro-short]` · `[outro-medium]`
-
-Example:
-  `[intro-medium] ; [verse] The strings arise. ; [chorus] Rise and fall. ; [outro-short]`
-
-English lines should end with `.` before `;` (auto_fix_english_punctuation=True handles this).
-
-## Style cloning
-Pass `style_audio_prompt_path` pointing to a ~10s WAV on the Studio host to condition
-generation on that reference clip's timbre and production style.
-
-## Exports
-- Plex: `POST /api/export/plex` with repo_id
-- VirtualDJ: `POST /api/export/virtualdj` — deck, auto_play, sync_to_master, cue_at_start
-- Reaper: `POST /api/export/reaper` with repo_id
-
-## SG2 vs Lyria
-`help(topic="lyria")` or resource `docs://lyria-vs-sg2`
+## Examples
+- generate_song(lyrics="Verse 1...", genre="Pop", mood="Energetic")
+- get_status()
+- help(topic="lyria") — SG2 vs Gemini Lyria 3 Pro snapshot
 """
     else:
-        return """\
-# songgeneration-mcp — Advanced Help
+        return """# songgeneration-mcp - Advanced Help
 
-## Under the hood
+## Under the Hood
+Bridges to SongGeneration-Studio REST. Payloads include an `sg2` block (repo, v2-large,
+max_length_seconds=270, torch_dtype=bfloat16, dual tracks, optional style_rag).
+Resource `sg2://structural-tags` lists SG2 length markers.
 
-The MCP server wraps SongGeneration-Studio's REST API. `generate_song` builds an `sg2` payload
-(model_repo, model_weights, max_length_seconds, torch_dtype, dual_track, optional style_rag)
-and POSTs to Studio's `/api/generate`. Studio manages the model-server subprocess and GPU queue.
+## SG2 vs Gemini Lyria 3 Pro (March 2026)
+- **Lyria 3 Pro**: Cloud + Gemini; **low $/track** (~**$0.08/song** in many tiers—**verify**).
+  Strong fit for fast iteration and Google's AI roadmap.
+- **LeVo 2 / SG2**: **Local** open-weight path; upfront GPU; no per-song cloud meter.
+  Often stronger for **classical**, **rubato**, and **instrumental** articulation; SG2 length tags
+  reduce generic section timing. Useful **counterweight** to **US-centric** commercial defaults—
+  not a knock on Google's push (many teams use **both**).
 
-Generation produces discrete codec tokens for two streams (vocal, instrumental), decoded to
-48 kHz stereo WAVs. The dual-track output is not post-hoc separation — it is the model's native
-output, so stems are phase-coherent with the mix.
-
-## SG2 architecture
-- Transformer over discrete audio codec tokens (not diffusion)
-- Conditioned on: lyrics (text tokens), genre/mood/BPM embeddings, voice tag, optional style audio
-- Length tags in lyrics give per-section duration priors to the model
-- v2-large: ~22 GB VRAM in bfloat16; v2-medium available for lower-VRAM setups
-
-## SG2 vs Gemini Lyria 3 Pro (technical)
-
-| | SG2 / LeVo 2 | Gemini Lyria 3 Pro |
-| --- | --- | --- |
-| Architecture | Discrete-codec transformer | Diffusion-based |
-| Weights | Open (Hugging Face) | Closed, cloud-only |
-| Stems | vocal.wav + inst.wav native | Single mix |
-| Section control | Length tags in lyrics | Prompt wording only |
-| Training priors | Tencent catalog, C-pop | Google-licensed, Western pop/rock |
-| Cost model | Hardware + electricity | ~$0.08/track cloud (verify) |
-| VRAM | ~22 GB (v2-large bfloat16) | None (cloud) |
-
-## API endpoints (Starlette ASGI, port 10885)
-- GET  /api/health
-- GET  /api/studio/status — Studio reachability + generation queue
-- GET  /api/studio/test  — deep check: dir, HTTP, GPU, model-server, models
-- GET  /api/studio/info
-- POST /api/generate
-- GET  /api/songs  ·  GET /api/songs/{repo_id}
-- GET/POST /api/settings
-- POST /api/export/plex  ·  /api/export/virtualdj  ·  /api/export/reaper
-- GET  /api/export/virtualdj/status
-- GET  /api/media/{file_path:path}
-- *    /mcp  — MCP streamable-HTTP transport
-
-Full doc: resource `docs://lyria-vs-sg2`, file `docs/LYRIA_VS_SG2.md`
+Full write-up: resource `docs://lyria-vs-sg2` or `help(topic="lyria")`.
 """
 
 

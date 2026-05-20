@@ -11,6 +11,7 @@ export default defineConfig({
   },
   server: {
     port: 10884,
+    strictPort: true,
     host: "127.0.0.1",
     proxy: {
       // Same-origin fetches from the React app during dev (backend: start.ps1 port 10885)
