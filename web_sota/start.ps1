@@ -28,7 +28,7 @@ foreach ($p in $pids) {
 Set-Location $PSScriptRoot
 if (-not (Test-Path "node_modules")) { npm install }
 
-# 2b. SongGeneration-Studio (GPU inference) — required for generation; same `uv` toolchain as this repo
+# 2b. SongGeneration-Studio (GPU inference) - required for generation; same `uv` toolchain as this repo
 $studioListener = Get-NetTCPConnection -LocalPort $StudioPort -State Listen -ErrorAction SilentlyContinue
 if (-not $studioListener) {
     $studioMain = Join-Path $StudioDir "main.py"
@@ -43,13 +43,13 @@ if (-not $studioListener) {
             $sw++
         }
     } else {
-        Write-Host "SongGeneration-Studio not found at $StudioDir — set SONGGEN_STUDIO_DIR or clone Studio; generation will fail until Studio is up." -ForegroundColor Yellow
+        Write-Host "SongGeneration-Studio not found at $StudioDir - set SONGGEN_STUDIO_DIR or clone Studio; generation will fail until Studio is up." -ForegroundColor Yellow
     }
 } else {
     Write-Host "SongGeneration-Studio already listening on port $StudioPort." -ForegroundColor Green
 }
 
-# 3. Start the Python backend (Background) from project root — same pattern as other fleet MCP web_sota servers
+# 3. Start the Python backend (Background) from project root - same pattern as other fleet MCP web_sota servers
 Write-Host "Starting Python backend on port $BackendPort ..." -ForegroundColor Cyan
 $backendCmd = "`$env:PYTHONPATH = '$ProjectRoot\src'; Set-Location '$ProjectRoot'; uv run --project '$ProjectRoot' uvicorn songgeneration_mcp.server:app --host 127.0.0.1 --port $BackendPort --log-level info"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
@@ -74,7 +74,7 @@ while ($attempt -lt $maxAttempts) {
     $attempt++
 }
 if ($backendUp) {
-    Write-Host "Backend (port $BackendPort) answered GET /api/health — ready for Vite proxy." -ForegroundColor Green
+    Write-Host "Backend (port $BackendPort) answered GET /api/health - ready for Vite proxy." -ForegroundColor Green
 } else {
     Write-Host "Backend (port $BackendPort) did not return HTTP 200 from /api/health after $($maxAttempts * 2)s. Open the uvicorn PowerShell window for errors." -ForegroundColor Yellow
 }
