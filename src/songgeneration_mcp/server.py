@@ -270,6 +270,32 @@ async def api_generate_post(request: Request) -> JSONResponse:
     except Exception:
         pass
 
+    # Backend 3: Stable Audio Open (HuggingFace diffusers, local, first load ~3GB)
+    try:
+        from diffusers import StableAudioPipeline
+        import torch, soundfile as sf, tempfile
+        pipe = StableAudioPipeline.from_pretrained(
+            "stabilityai/stable-audio-open-1.0",
+            torch_dtype=torch.float16,
+            variant="fp16"
+        ).to("cuda")
+        generator = torch.Generator("cuda").manual_seed(0)
+        audio = pipe(
+            prompt,
+            negative_prompt="Low quality.",
+            num_inference_steps=100,
+            audio_end_in_s=min(duration, 47),
+            num_waveforms_per_prompt=1,
+            generator=generator,
+        ).audios
+        out_dir = tempfile.mkdtemp()
+        out_path = os.path.join(out_dir, "stableaudio.wav")
+        output = audio[0].T.float().cpu().numpy()
+        sf.write(out_path, output, pipe.vae.sampling_rate)
+        return JSONResponse({"success": True, "file": out_path, "duration": min(duration, 47), "prompt": prompt, "model": "stable-audio-open-1.0", "backend": "stableaudio"})
+    except Exception:
+        pass
+
     settings = load_settings()
     await ensure_studio_available(_logic.base_url, studio_dir=settings.get("studio_dir"))
     result = await _logic.generate_song_result(body)

@@ -53,6 +53,9 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "S", "UP", "RUF"]
 ignore = ["S101", "B008"]
 
+[project.optional-dependencies]
+full = ["transformers>=4.40.0", "scipy", "torch>=2.0.0", "diffusers>=0.30.0", "soundfile>=0.12.0"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
