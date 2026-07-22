@@ -46,3 +46,7 @@ Thumbs.db
 target/
 
 _dashboard/
+
+# Backup files
+*.bak
+*.bak.*
