@@ -7,7 +7,6 @@ for the web UI: generate, Studio status, song repository.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 import httpx
@@ -202,74 +201,6 @@ async def api_generate_post(request: Request) -> JSONResponse:
         return JSONResponse({"success": False, "error": f"invalid json: {e}"}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
-    prompt = str(body.get("prompt", body.get("genre", "")))
-    duration = int(body.get("duration", body.get("max_length_seconds", 30)))
-
-    # Try Lyria first (Google Vertex AI, requires GOOGLE_CLOUD_PROJECT env var)
-    try:
-        from google import genai
-        from google.genai import types as _genai_types
-
-        project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-        if project:
-            client = genai.Client(vertexai=True, project=project, location="global")
-            import tempfile
-
-            out_dir = tempfile.mkdtemp()
-            out_path = os.path.join(out_dir, "lyria.wav")
-            response = client.models.generate_content(
-                model="lyria-3-pro-preview",
-                contents=prompt,
-                config=_genai_types.GenerateContentConfig(
-                    audio_timestamp=True, output_audio_format="wav"
-                ),
-            )
-            if response.candidates and response.candidates[0].audio:
-                with open(out_path, "wb") as f:
-                    f.write(response.candidates[0].audio.data)
-                return JSONResponse(
-                    {
-                        "success": True,
-                        "file": out_path,
-                        "duration": duration,
-                        "prompt": prompt,
-                        "model": "lyria-3-pro-preview",
-                        "backend": "lyria",
-                    }
-                )
-    except Exception:
-        pass
-
-    # Try MusicGen (local HuggingFace model, first call downloads ~2GB)
-    try:
-        from transformers import AutoProcessor, MusicGenForConditionalGeneration
-        import torch, scipy.io.wavfile
-
-        processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
-        model = MusicGenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = model.to(device)
-        inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
-        audio_values = model.generate(**inputs, do_sample=True, guidance_scale=3.0, max_new_tokens=duration * 50)
-        import tempfile
-
-        out_dir = tempfile.mkdtemp()
-        out_path = os.path.join(out_dir, "generated.wav")
-        sampling_rate = model.config.audio_encoder.sampling_rate
-        scipy.io.wavfile.write(out_path, rate=sampling_rate, data=audio_values[0, 0].cpu().numpy())
-        return JSONResponse(
-            {
-                "success": True,
-                "file": out_path,
-                "duration": duration,
-                "prompt": prompt,
-                "model": "musicgen-small",
-                "backend": "musicgen",
-            }
-        )
-    except Exception:
-        pass
-
     settings = load_settings()
     await ensure_studio_available(_logic.base_url, studio_dir=settings.get("studio_dir"))
     result = await _logic.generate_song_result(body)

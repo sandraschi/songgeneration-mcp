@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import API_BASE, { fetchSettings, postSettings } from "@/lib/api";
+import { fetchSettings, postSettings } from "@/lib/api";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 function LLMSettings() {
@@ -12,7 +12,7 @@ function LLMSettings() {
     const [selectedModel, setSelectedModel] = useState("");
     const [status, setStatus] = useState<"loading"|"ready"|"error">("loading");
     useEffect(() => {
-        fetch(API_BASE + "/api/llm/providers").then(r => r.json()).then(d => {
+        fetch("/api/llm/providers").then(r => r.json()).then(d => {
             setProviders(d);
             const savedP = localStorage.getItem("llm_provider") || "ollama";
             const savedM = localStorage.getItem("llm_model") || "";
