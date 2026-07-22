@@ -15,6 +15,7 @@ import {
     ScrollText,
     Music2,
     Headphones,
+    Sparkles,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const navItems = [
         { href: '/', label: 'Home', icon: LayoutDashboard },
         { href: '/generate', label: 'Generate', icon: Music2 },
+        { href: '/quick', label: 'Quick', icon: Sparkles },
         { href: '/listen', label: 'Listen', icon: Headphones },
         { href: '/tools', label: 'Tools', icon: Wrench },
         { href: '/status', label: 'Status', icon: Activity },

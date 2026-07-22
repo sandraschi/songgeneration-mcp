@@ -11,6 +11,7 @@ import { LocalLlm } from '@/pages/local-llm';
 import { Logger } from '@/pages/logger';
 import { Generate } from '@/pages/generate';
 import { Listen } from '@/pages/listen';
+import QuickGenerate from '@/pages/quick';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/generate" element={<Generate />} />
+          <Route path="/quick" element={<QuickGenerate />} />
           <Route path="/listen" element={<Listen />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/status" element={<Status />} />
