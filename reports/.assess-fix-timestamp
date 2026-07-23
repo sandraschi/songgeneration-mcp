@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-07-23T07:12:00+02:00",
+  "repo": "songgeneration-mcp",
+  "issues_fixed": {
+    "critical": ["AGENTS.md stub", "missing llms.txt/llms-full.txt", "missing glama.json", "missing .env.example", "start.ps1 no zombie clearing", "tauri.conf.json .env leak", "pyproject.toml wrong author", "reports/ not gitignored"],
+    "high": ["pyproject.toml missing entry point"],
+    "medium": ["gitignore missing node_modules"],
+    "low": ["stale .bak files"]
+  },
+  "score": "B"
+}
