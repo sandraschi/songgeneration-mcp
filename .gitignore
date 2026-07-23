@@ -50,3 +50,7 @@ _dashboard/
 # Backup files
 *.bak
 *.bak.*
+
+# Reports
+reports/
+

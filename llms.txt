@@ -1,0 +1,14 @@
+# songgeneration-mcp
+
+AI music generation server with 4 backends.
+
+- [llms-full.txt](llms-full.txt) — full context
+- [README.md](README.md) — quick start
+- [docs/INSTALL.md](docs/INSTALL.md) — installation guide
+- [docs/BACKENDS.md](docs/BACKENDS.md) — backend comparison
+
+## Quick Start
+```
+uv sync && uv run uvicorn songgeneration_mcp.server:app --port 10885
+curl http://127.0.0.1:10885/api/v1/generate -d '{"prompt":"tech house 128 BPM","duration":30}'
+```

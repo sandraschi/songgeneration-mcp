@@ -1,8 +1,8 @@
 [project]
 name = "songgeneration_mcp"
 version = "0.1.0"
-description = "SongGeneration v2 (LeVo 2 / SG2) MCP server: local open-weight music LM via SongGeneration-Studio; dual-track output and SG2 tags."
-authors = [{name = "MCP Studio"}]
+description = "AI music generation server — 4 backends: Lyria, Stable Audio Open, MusicGen, Studio SG2"
+authors = [{name = "Sandra Schipal", email = "sandraschipal@gmail.com"}]
 requires-python = ">=3.12"
 readme = "README.md"
 license = {text = "MIT"}
@@ -28,6 +28,9 @@ full = [
     "scipy",
     "torch>=2.0.0",
 ]
+
+[project.scripts]
+songgen = "songgeneration_mcp.mcp_server:main"
 
 [project.urls]
 Repository = "https://github.com/sandraschi/songgeneration-mcp"

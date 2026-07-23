@@ -1,0 +1,19 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "id": "songgeneration-mcp",
+  "name": "SongGeneration MCP",
+  "description": "AI music generation from text prompts via 4 backends (Lyria, Stable Audio, MusicGen, Studio SG2)",
+  "short_description": "Text-to-music generation server",
+  "author": "sandraschi",
+  "homepage": "https://github.com/sandraschi/songgeneration-mcp",
+  "repository": "https://github.com/sandraschi/songgeneration-mcp",
+  "license": "MIT",
+  "categories": ["media", "music", "ai"],
+  "tags": ["music", "generation", "ai", "audio", "lyria", "stable-audio", "musicgen"],
+  "requirements": ["Python 3.12+", "CUDA GPU recommended for local models"],
+  "tools": [
+    {"name": "song_generate", "description": "Generate music from text prompt using available backends"},
+    {"name": "song_list", "description": "List previously generated tracks"},
+    {"name": "song_export", "description": "Export generated track to Plex, Reaper, or VirtualDJ"}
+  ]
+}

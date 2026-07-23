@@ -1,0 +1,44 @@
+# songgeneration-mcp — Full LLM Context
+
+## What It Is
+
+songgeneration-mcp is a FastMCP 3.4+ server that generates music from text prompts. It tries 4 backends in order: Lyria 3 Pro (Vertex AI) → Stable Audio Open 1.0 (diffusers) → MusicGen-small (transformers) → Studio SG2 (local API).
+
+## API
+
+`POST /api/v1/generate` — `{"prompt": "...", "duration": 30}`
+
+Returns `{"success": true, "file": "/tmp/...wav", "backend": "lyria|stableaudio|musicgen|studio", "model": "..."}`
+
+## Backends
+
+| Backend | Quality | Requires | First load |
+|---------|---------|----------|------------|
+| Lyria 3 Pro | Best | `GOOGLE_CLOUD_PROJECT` | None (API) |
+| Stable Audio Open 1.0 | Good (instrumentals) | `diffusers` | ~3GB |
+| MusicGen-small | Fair | `transformers` | ~2GB |
+| Studio SG2 | Variable | SongGeneration-Studio | ~5GB |
+
+## Env Vars
+
+| Var | Default | Description |
+|-----|---------|-------------|
+| `SONGGENERATION_STUDIO_URL` | `http://localhost:10930` | Studio API URL |
+| `SONGGEN_STUDIO_DIR` | — | Studio install directory |
+| `SONGGEN_LOG_BUFFER_LINES` | 500 | Log buffer size |
+| `GOOGLE_CLOUD_PROJECT` | — | GCP project for Lyria |
+
+## Architecture
+
+```
+User → FastMCP/HTTP → songgeneration-mcp → Lyria / Stable Audio / MusicGen / Studio
+                                              ↓
+                                        WAV file → load to mixx-dj-mcp deck
+```
+
+## Install
+
+```powershell
+uv sync
+uv run uvicorn songgeneration_mcp.server:app --port 10885
+```
