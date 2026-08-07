@@ -10,9 +10,7 @@ from songgeneration_mcp.logic import SongGenerationLogic
 @respx.mock
 async def test_list_models():
     logic = SongGenerationLogic(base_url="http://test")
-    respx.get("http://test/api/models").respond(
-        json={"models": [{"id": "model1"}, {"id": "model2"}]}
-    )
+    respx.get("http://test/api/models").respond(json={"models": [{"id": "model1"}, {"id": "model2"}]})
 
     models = await logic.list_models()
     assert models == ["model1", "model2"]

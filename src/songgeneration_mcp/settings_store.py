@@ -28,10 +28,7 @@ def load_settings() -> dict[str, Any]:
         data["plex_export_dir_from_env"] = True
     else:
         data["plex_export_dir_from_env"] = False
-    env_studio = (
-        os.getenv("SONGGENERATION_STUDIO_URL", "").strip()
-        or os.getenv("SONGGEN_STUDIO_BASE_URL", "").strip()
-    )
+    env_studio = os.getenv("SONGGENERATION_STUDIO_URL", "").strip() or os.getenv("SONGGEN_STUDIO_BASE_URL", "").strip()
     if env_studio:
         data["studio_url"] = env_studio
         data["studio_url_from_env"] = True

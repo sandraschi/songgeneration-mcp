@@ -1,4 +1,4 @@
-set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set windows-shell := ["powershell.exe", "-NoProfile", "-Command"]
 import 'scripts/just/fleet.just'
 
 default:
@@ -7,12 +7,12 @@ default:
 # Install all music generation backends
 install-all:
     Set-Location '{{justfile_directory()}}'
-    pwsh -NoProfile -File scripts/install-music-deps.ps1 -All
+    powershell.exe -NoProfile -File scripts/install-music-deps.ps1 -All
 
 # Install minimal (Studio API only)
 install-minimal:
     Set-Location '{{justfile_directory()}}'
-    pwsh -NoProfile -File scripts/install-music-deps.ps1 -Minimal
+    powershell.exe -NoProfile -File scripts/install-music-deps.ps1 -Minimal
 
 # Serve the API server
 serve:
@@ -43,3 +43,9 @@ fix:
     uv run ruff format src/
     Set-Location '{{justfile_directory()}}\web_sota'
     npx @biomejs/biome check --write .
+
+# Bootstrap: install dev deps + pre-commit hook
+bootstrap:
+    uv sync --group dev
+    uv run pre-commit install
+    Write-Host "Pre-commit hooks installed." -ForegroundColor Green

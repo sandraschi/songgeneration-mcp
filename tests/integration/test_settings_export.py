@@ -104,6 +104,7 @@ async def test_api_export_virtualdj(tmp_path, monkeypatch: pytest.MonkeyPatch) -
     update_entry(entry["repo_id"], {"mp3_urls": ["/api/media/vdj.mp3"]})
 
     vdj_drop = tmp_path / "virtualdj_drop"
+
     class _FakeAsyncClient:
         def __init__(self, *args, **kwargs) -> None:
             pass

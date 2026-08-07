@@ -34,9 +34,7 @@ def _in_github_actions() -> bool:
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_song_generation_and_reaper_export_ci_mocked(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_song_generation_and_reaper_export_ci_mocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Mocked Studio + Reaper; runs only on GitHub Actions."""
     if not _in_github_actions():
         pytest.skip("Mocked integration runs in CI only")
@@ -68,9 +66,7 @@ async def test_song_generation_and_reaper_export_ci_mocked(
         return ["/api/media/mary.mp3"]
 
     monkeypatch.setattr("songgeneration_mcp.server.download_audio_urls_to_local", fake_download)
-    respx.post(f"{reaper_api}/api/v1/project/import_media").respond(
-        json={"success": True, "imported": True}
-    )
+    respx.post(f"{reaper_api}/api/v1/project/import_media").respond(json={"success": True, "imported": True})
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -114,9 +110,7 @@ async def test_song_generation_and_reaper_export_ci_mocked(
 
 
 @pytest.mark.asyncio
-async def test_song_generation_and_reaper_export_real_local(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_song_generation_and_reaper_export_real_local(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Real httpx to Studio and Reaper; not run in CI. No respx, no fake download."""
     if _in_github_actions():
         pytest.skip("Real Studio+Reaper integration runs locally only")

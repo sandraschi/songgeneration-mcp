@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -65,8 +65,7 @@ def extract_audio_urls(obj: Any, *, studio_base_url: str | None = None) -> list[
                     "src",
                 ) and isinstance(v, str):
                     if v.startswith(("http://", "https://")) and any(
-                        v.lower().endswith(ext)
-                        for ext in (".wav", ".mp3", ".ogg", ".flac", ".m4a")
+                        v.lower().endswith(ext) for ext in (".wav", ".mp3", ".ogg", ".flac", ".m4a")
                     ):
                         found.append(v)
                     elif v.startswith(("http://", "https://")) and "/audio" in v.lower():
@@ -160,7 +159,7 @@ def add_generation_entry(
     stem_urls = extract_stem_urls(studio_response)
     entry: dict[str, Any] = {
         "repo_id": str(uuid.uuid4()),
-        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "generation_id": generation_id,
         "title": title,
         "genre": genre,

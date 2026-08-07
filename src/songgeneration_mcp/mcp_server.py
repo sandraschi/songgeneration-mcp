@@ -24,9 +24,7 @@ SONG_REQUEST_SCHEMA = {
         "title": {"type": "string", "description": "Title of the song"},
         "lyrics": {
             "type": "string",
-            "description": (
-                "Complete lyrics (SG2: length tags; English lines end with '.' before ';')"
-            ),
+            "description": ("Complete lyrics (SG2: length tags; English lines end with '.' before ';')"),
         },
         "genre": {"type": "string", "description": "Musical genre"},
         "emotion": {"type": "string", "description": "Musical emotion/mood"},
@@ -39,9 +37,7 @@ SONG_REQUEST_SCHEMA = {
         "torch_dtype": {"type": "string", "default": "bfloat16"},
         "style_audio_prompt_path": {
             "type": "string",
-            "description": (
-                "Optional path to ~10s audio on the Studio host for style cloning (Style RAG)"
-            ),
+            "description": ("Optional path to ~10s audio on the Studio host for style cloning (Style RAG)"),
         },
         "mix_dual_tracks": {"type": "boolean", "default": False},
     },
@@ -332,11 +328,7 @@ async def get_status() -> str:
         Formatted Markdown report of the system status.
     """
     status_data = await logic.get_status()
-    vram_percent = (
-        (status_data["vram_used"] / status_data["vram_total"] * 100)
-        if status_data["vram_total"] > 0
-        else 0
-    )
+    vram_percent = (status_data["vram_used"] / status_data["vram_total"] * 100) if status_data["vram_total"] > 0 else 0
 
     return f"""# SongGeneration System Status
 > [!NOTE]

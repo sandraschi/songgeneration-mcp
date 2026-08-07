@@ -66,9 +66,7 @@ async def api_logs_get(request: Request) -> JSONResponse:
 
 async def api_logs_clear(_request: Request) -> JSONResponse:
     removed = clear_buffer()
-    logging.getLogger(__name__).warning(
-        "Log buffer cleared by operator (%s entries removed).", removed
-    )
+    logging.getLogger(__name__).warning("Log buffer cleared by operator (%s entries removed).", removed)
     return JSONResponse({"cleared": removed})
 
 
@@ -95,14 +93,17 @@ async def api_studio_test(_request: Request) -> JSONResponse:
     if studio_dir:
         main_py = _Path(studio_dir) / "main.py"
         dir_ok = main_py.is_file()
-    checks.append({
-        "name": "studio_dir",
-        "ok": dir_ok,
-        "detail": studio_dir if studio_dir else "not configured",
-    })
+    checks.append(
+        {
+            "name": "studio_dir",
+            "ok": dir_ok,
+            "detail": studio_dir if studio_dir else "not configured",
+        }
+    )
 
     # 2. HTTP reachable — /api/health
     import httpx as _httpx
+
     health_ok = False
     health_detail = ""
     try:
@@ -127,8 +128,8 @@ async def api_studio_test(_request: Request) -> JSONResponse:
                     if gpu_ok:
                         g = gd.get("gpu", {})
                         gpu_detail = (
-                            f"{g.get('name','?')} — "
-                            f"{g.get('free_gb','?')} GB free / {g.get('total_gb','?')} GB total"
+                            f"{g.get('name', '?')} — "
+                            f"{g.get('free_gb', '?')} GB free / {g.get('total_gb', '?')} GB total"
                         )
                     else:
                         gpu_detail = gd.get("error") or "GPU not available"
@@ -172,18 +173,18 @@ async def api_studio_test(_request: Request) -> JSONResponse:
     checks.append({"name": "models_ready", "ok": model_ok, "detail": model_detail})
 
     overall = all(c["ok"] for c in checks)
-    return JSONResponse({
-        "ok": overall,
-        "studio_url": studio_url,
-        "checks": checks,
-    })
+    return JSONResponse(
+        {
+            "ok": overall,
+            "studio_url": studio_url,
+            "checks": checks,
+        }
+    )
 
 
 async def api_studio_info(_request: Request) -> JSONResponse:
     settings = load_settings()
-    reachable = await ensure_studio_available(
-        _logic.base_url, studio_dir=settings.get("studio_dir")
-    )
+    reachable = await ensure_studio_available(_logic.base_url, studio_dir=settings.get("studio_dir"))
     status = await _logic.get_status()
     return JSONResponse(
         {
@@ -220,9 +221,7 @@ async def api_generate_post(request: Request) -> JSONResponse:
             response = client.models.generate_content(
                 model="lyria-3-pro-preview",
                 contents=prompt,
-                config=_genai_types.GenerateContentConfig(
-                    audio_timestamp=True, output_audio_format="wav"
-                ),
+                config=_genai_types.GenerateContentConfig(audio_timestamp=True, output_audio_format="wav"),
             )
             if response.candidates and response.candidates[0].audio:
                 with open(out_path, "wb") as f:
@@ -242,8 +241,9 @@ async def api_generate_post(request: Request) -> JSONResponse:
 
     # Try MusicGen (local HuggingFace model, first call downloads ~2GB)
     try:
+        import scipy.io.wavfile
+        import torch
         from transformers import AutoProcessor, MusicGenForConditionalGeneration
-        import torch, scipy.io.wavfile
 
         processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
         model = MusicGenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
@@ -272,12 +272,14 @@ async def api_generate_post(request: Request) -> JSONResponse:
 
     # Backend 3: Stable Audio Open (HuggingFace diffusers, local, first load ~3GB)
     try:
+        import tempfile
+
+        import soundfile as sf
+        import torch
         from diffusers import StableAudioPipeline
-        import torch, soundfile as sf, tempfile
+
         pipe = StableAudioPipeline.from_pretrained(
-            "stabilityai/stable-audio-open-1.0",
-            torch_dtype=torch.float16,
-            variant="fp16"
+            "stabilityai/stable-audio-open-1.0", torch_dtype=torch.float16, variant="fp16"
         ).to("cuda")
         generator = torch.Generator("cuda").manual_seed(0)
         audio = pipe(
@@ -292,7 +294,16 @@ async def api_generate_post(request: Request) -> JSONResponse:
         out_path = os.path.join(out_dir, "stableaudio.wav")
         output = audio[0].T.float().cpu().numpy()
         sf.write(out_path, output, pipe.vae.sampling_rate)
-        return JSONResponse({"success": True, "file": out_path, "duration": min(duration, 47), "prompt": prompt, "model": "stable-audio-open-1.0", "backend": "stableaudio"})
+        return JSONResponse(
+            {
+                "success": True,
+                "file": out_path,
+                "duration": min(duration, 47),
+                "prompt": prompt,
+                "model": "stable-audio-open-1.0",
+                "backend": "stableaudio",
+            }
+        )
     except Exception:
         pass
 
@@ -348,14 +359,10 @@ async def api_generate_post(request: Request) -> JSONResponse:
                     role_urls = list(result.get("stem_urls", {}).get(role) or [])
                     if not role_urls:
                         continue
-                    role_mp3 = await transcode_audio_urls_to_mp3(
-                        role_urls, f"{entry['repo_id']}-{role}"
-                    )
+                    role_mp3 = await transcode_audio_urls_to_mp3(role_urls, f"{entry['repo_id']}-{role}")
                     mp3_stem_urls[role] = role_mp3
                 result["mp3_stem_urls"] = mp3_stem_urls
-                update_entry(
-                    entry["repo_id"], {"mp3_urls": mp3_urls, "mp3_stem_urls": mp3_stem_urls}
-                )
+                update_entry(entry["repo_id"], {"mp3_urls": mp3_urls, "mp3_stem_urls": mp3_stem_urls})
     return JSONResponse(result)
 
 
@@ -559,16 +566,12 @@ async def api_export_virtualdj_post(request: Request) -> JSONResponse:
                     f"{vdj_base}/api/v1/deck/{deck}/play_pause",
                     params={"action": "play"},
                 )
-                play_is_json = play_res.headers.get("content-type", "").startswith(
-                    "application/json"
-                )
+                play_is_json = play_res.headers.get("content-type", "").startswith("application/json")
                 play_data = play_res.json() if play_is_json else {"raw": play_res.text}
             sync_data: dict[str, object] | None = None
             if sync_to_master:
                 sync_res = await client.post(f"{vdj_base}/api/v1/deck/{deck}/sync")
-                sync_is_json = sync_res.headers.get("content-type", "").startswith(
-                    "application/json"
-                )
+                sync_is_json = sync_res.headers.get("content-type", "").startswith("application/json")
                 sync_data = sync_res.json() if sync_is_json else {"raw": sync_res.text}
             cue_data: dict[str, object] | None = None
             if cue_at_start:
@@ -576,9 +579,7 @@ async def api_export_virtualdj_post(request: Request) -> JSONResponse:
                     f"{vdj_base}/api/v1/deck/{deck}/cue",
                     params={"mode": "start"},
                 )
-                cue_is_json = cue_res.headers.get("content-type", "").startswith(
-                    "application/json"
-                )
+                cue_is_json = cue_res.headers.get("content-type", "").startswith("application/json")
                 cue_data = cue_res.json() if cue_is_json else {"raw": cue_res.text}
             return JSONResponse(
                 {
