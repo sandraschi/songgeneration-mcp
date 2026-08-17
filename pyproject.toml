@@ -59,3 +59,12 @@ ignore = ["S101", "B008", "S106", "S110", "S112", "S101", "B008", "S106", "S110"
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+[tool.uv.sources]
+torch = { index = "pytorch-cu126" }
+torchaudio = { index = "pytorch-cu126" }
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
