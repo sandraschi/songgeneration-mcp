@@ -14,6 +14,7 @@ dependencies = [
     "ruff>=0.16.0,<0.17",
     "imageio-ffmpeg>=0.6.0",
     "prefab-ui>=0.14.0",
+    "google-genai>=2.22.0",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,8 @@ full = [
     "transformers>=4.40.0",
     "scipy",
     "torch>=2.0.0",
+    "soundfile",
+    "diffusers>=0.30.0",
 ]
 
 [project.scripts]

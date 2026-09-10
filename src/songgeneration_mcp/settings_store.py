@@ -58,6 +58,24 @@ def load_settings() -> dict[str, Any]:
         data["reaper_api_base_from_env"] = True
     else:
         data["reaper_api_base_from_env"] = False
+    env_gcp_project = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+    if env_gcp_project:
+        data["google_cloud_project"] = env_gcp_project
+        data["google_cloud_project_from_env"] = True
+    else:
+        data["google_cloud_project_from_env"] = False
+    env_lyria_model = os.getenv("SONGGEN_LYRIA_MODEL", "").strip()
+    if env_lyria_model:
+        data["lyria_model"] = env_lyria_model
+        data["lyria_model_from_env"] = True
+    else:
+        data["lyria_model_from_env"] = False
+    env_hf_token = os.getenv("HF_TOKEN", "").strip()
+    if env_hf_token:
+        data["hf_token"] = env_hf_token
+        data["hf_token_from_env"] = True
+    else:
+        data["hf_token_from_env"] = False
     return data
 
 
@@ -77,6 +95,9 @@ def save_settings(patch: dict[str, Any]) -> dict[str, Any]:
             "virtualdj_api_base",
             "reaper_drop_dir",
             "reaper_api_base",
+            "google_cloud_project",
+            "lyria_model",
+            "hf_token",
         ):
             current[k] = v
     p.parent.mkdir(parents=True, exist_ok=True)

@@ -6,12 +6,17 @@ for the web UI: generate, Studio status, song repository.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import mimetypes
 import os
+import shutil
 from pathlib import Path
 
 import httpx
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
@@ -101,7 +106,7 @@ async def api_studio_test(_request: Request) -> JSONResponse:
         }
     )
 
-    # 2. HTTP reachable — /api/health
+    # 2. HTTP reachable - /api/health
     import httpx as _httpx
 
     health_ok = False
@@ -128,7 +133,7 @@ async def api_studio_test(_request: Request) -> JSONResponse:
                     if gpu_ok:
                         g = gd.get("gpu", {})
                         gpu_detail = (
-                            f"{g.get('name', '?')} — "
+                            f"{g.get('name', '?')} - "
                             f"{g.get('free_gb', '?')} GB free / {g.get('total_gb', '?')} GB total"
                         )
                     else:
@@ -149,7 +154,7 @@ async def api_studio_test(_request: Request) -> JSONResponse:
                     ms_ok = ms.get("running", False)
                     if ms_ok:
                         loaded = ms.get("model_id") if ms.get("loaded") else None
-                        ms_detail = f"running — model: {loaded or 'none loaded'}"
+                        ms_detail = f"running - model: {loaded or 'none loaded'}"
                     else:
                         ms_detail = ms.get("error") or "not running"
         except Exception as exc:
@@ -196,6 +201,245 @@ async def api_studio_info(_request: Request) -> JSONResponse:
     )
 
 
+def _check_lyria_adc() -> tuple[bool, str, str | None]:
+    """Blocking check: do valid Application Default Credentials exist?
+
+    Runs a real token refresh (free -- no Vertex AI call) so an expired or
+    revoked ADC shows up as not-ready, not just "a file exists somewhere".
+
+    Fast-paths the common "nothing configured yet" case: with no ADC file and
+    no GOOGLE_APPLICATION_CREDENTIALS, google.auth.default() still falls
+    through to probing the GCE metadata server, which takes ~10s+ to time out
+    on a non-cloud machine. Skip straight to "not found" instead of making
+    every Settings-page load (and every Recheck click) eat that wait.
+    """
+    if not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        try:
+            from google.auth import _cloud_sdk
+
+            if not os.path.isfile(_cloud_sdk.get_application_default_credentials_path()):
+                return False, "no Application Default Credentials file found", None
+        except Exception:
+            pass  # internal helper unavailable/changed -- fall through to the real check
+    try:
+        import google.auth
+        from google.auth.transport.requests import Request as _GoogleAuthRequest
+
+        creds, adc_project = google.auth.default()
+        creds.refresh(_GoogleAuthRequest())
+        return True, f"valid ({type(creds).__name__})", adc_project
+    except Exception as e:
+        return False, str(e) or type(e).__name__, None
+
+
+async def api_lyria_status(_request: Request) -> JSONResponse:
+    """Onboarding-wizard status: what's configured, what's missing, why."""
+    settings = load_settings()
+    project = settings.get("google_cloud_project") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    lyria_model = settings.get("lyria_model") or os.environ.get("SONGGEN_LYRIA_MODEL") or "lyria-002"
+    gcloud_installed = shutil.which("gcloud") is not None
+    adc_found, adc_detail, adc_project = await asyncio.to_thread(_check_lyria_adc)
+    return JSONResponse(
+        {
+            "gcloud_installed": gcloud_installed,
+            "project": project,
+            "project_configured": bool(project),
+            "adc_found": adc_found,
+            "adc_detail": adc_detail,
+            "adc_project": adc_project,
+            "lyria_model": lyria_model,
+            "ready": bool(project) and adc_found,
+        }
+    )
+
+
+def _check_hf_token(token: str | None) -> tuple[bool, str]:
+    """Blocking check: does this Hugging Face token authenticate, and can it
+    reach the gated Stable Audio Open repo? Both are free API calls."""
+    if not token:
+        return False, "no token configured"
+    try:
+        from huggingface_hub import HfApi
+
+        api = HfApi(token=token)
+        who = api.whoami()
+        try:
+            api.model_info("stabilityai/stable-audio-open-1.0", token=token)
+        except Exception as e:
+            return False, f"token valid ({who.get('name', '?')}) but no access to stable-audio-open-1.0: {e}"
+        return True, f"valid ({who.get('name', '?')}), gated model access confirmed"
+    except Exception as e:
+        return False, str(e) or type(e).__name__
+
+
+async def api_huggingface_status(_request: Request) -> JSONResponse:
+    """Onboarding-wizard status for the Stable Audio Open gated model."""
+    settings = load_settings()
+    token = settings.get("hf_token") or os.environ.get("HF_TOKEN")
+    token_configured = bool(token)
+    ok, detail = await asyncio.to_thread(_check_hf_token, token)
+    return JSONResponse(
+        {
+            "token_configured": token_configured,
+            "token_valid": ok,
+            "detail": detail,
+            "ready": ok,
+        }
+    )
+
+
+def _run_lyria_sync(prompt: str, duration: int, project: str, lyria_model: str) -> dict[str, object]:
+    """Blocking: one Vertex AI Lyria call. Raises on any failure."""
+    from google import genai
+    from google.genai import types as _genai_types
+
+    client = genai.Client(vertexai=True, project=project, location="global")
+    import tempfile
+
+    # GenerateContentConfig has no `output_audio_format` field (verified against the
+    # installed google-genai SDK); audio output is requested via response_modalities.
+    response = client.models.generate_content(
+        model=lyria_model,
+        contents=prompt,
+        config=_genai_types.GenerateContentConfig(audio_timestamp=True, response_modalities=["AUDIO"]),
+    )
+    audio_blob = None
+    if response.candidates and response.candidates[0].content:
+        for part in response.candidates[0].content.parts or []:
+            if part.inline_data and part.inline_data.data:
+                audio_blob = part.inline_data
+                break
+    if audio_blob is None:
+        raise ValueError("no audio part in response")
+    ext = mimetypes.guess_extension((audio_blob.mime_type or "").split(";")[0].strip()) or ".wav"
+    out_dir = tempfile.mkdtemp()
+    out_path = os.path.join(out_dir, f"lyria{ext}")
+    with open(out_path, "wb") as f:
+        f.write(audio_blob.data)
+    return {
+        "success": True,
+        "file": out_path,
+        "duration": duration,
+        "prompt": prompt,
+        "model": lyria_model,
+        "backend": "lyria",
+    }
+
+
+def _run_musicgen_sync(prompt: str, duration: int) -> dict[str, object]:
+    """Blocking: local MusicGen inference (first call downloads ~2GB). Raises on failure."""
+    import tempfile
+
+    import scipy.io.wavfile
+    import torch
+    from transformers import AutoProcessor, MusicgenForConditionalGeneration
+
+    processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
+    model = MusicgenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+    inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
+    audio_values = model.generate(**inputs, do_sample=True, guidance_scale=3.0, max_new_tokens=duration * 50)
+    out_dir = tempfile.mkdtemp()
+    out_path = os.path.join(out_dir, "generated.wav")
+    sampling_rate = model.config.audio_encoder.sampling_rate
+    scipy.io.wavfile.write(out_path, rate=sampling_rate, data=audio_values[0, 0].cpu().numpy())
+    return {
+        "success": True,
+        "file": out_path,
+        "duration": duration,
+        "prompt": prompt,
+        "model": "musicgen-small",
+        "backend": "musicgen",
+    }
+
+
+def _run_stableaudio_sync(prompt: str, duration: int, hf_token: str | None) -> dict[str, object]:
+    """Blocking: local Stable Audio Open inference (first load ~3GB, gated model). Raises on failure."""
+    import tempfile
+
+    import soundfile as sf
+    import torch
+    from diffusers import StableAudioPipeline
+
+    pipe = StableAudioPipeline.from_pretrained(
+        "stabilityai/stable-audio-open-1.0", dtype=torch.float16, variant="fp16", token=hf_token
+    ).to("cuda")
+    generator = torch.Generator("cuda").manual_seed(0)
+    audio = pipe(
+        prompt,
+        negative_prompt="Low quality.",
+        num_inference_steps=100,
+        audio_end_in_s=min(duration, 47),
+        num_waveforms_per_prompt=1,
+        generator=generator,
+    ).audios
+    out_dir = tempfile.mkdtemp()
+    out_path = os.path.join(out_dir, "stableaudio.wav")
+    output = audio[0].T.float().cpu().numpy()
+    sf.write(out_path, output, pipe.vae.sampling_rate)
+    return {
+        "success": True,
+        "file": out_path,
+        "duration": min(duration, 47),
+        "prompt": prompt,
+        "model": "stable-audio-open-1.0",
+        "backend": "stableaudio",
+    }
+
+
+async def _try_local_backends(prompt: str, duration: int) -> tuple[dict[str, object] | None, dict[str, str]]:
+    """Quick-chain: Lyria -> MusicGen -> Stable Audio Open.
+
+    Each backend's actual model/API call is synchronous and can run for
+    minutes (first-run downloads, GPU inference) -- every one runs via
+    ``asyncio.to_thread`` so it can't freeze the server's single event loop
+    and take the rest of the dashboard down with it.
+
+    Returns ``(payload, errors)``: the success payload
+    (``success/file/duration/prompt/model/backend``) or ``None`` when every
+    backend failed, plus per-backend error strings for setup diagnostics.
+    """
+    log = logging.getLogger(__name__)
+    errors: dict[str, str] = {}
+
+    # Backend 1: Lyria (Google Vertex AI, needs GCP project + ADC credentials)
+    project = load_settings().get("google_cloud_project") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+    lyria_model = (
+        str(load_settings().get("lyria_model") or "").strip()
+        or os.environ.get("SONGGEN_LYRIA_MODEL", "").strip()
+        or "lyria-002"
+    )
+    if not project:
+        log.info(
+            "Lyria skipped: no Google Cloud project configured (Settings > Lyria, or GOOGLE_CLOUD_PROJECT env var)."
+        )
+    else:
+        try:
+            payload = await asyncio.to_thread(_run_lyria_sync, prompt, duration, project, lyria_model)
+            return payload, errors
+        except Exception as e:
+            errors["lyria"] = str(e) or type(e).__name__
+            log.exception("Lyria generation failed; falling back to next backend.")
+
+    # Backend 2: MusicGen (local HuggingFace model, first call downloads ~2GB)
+    try:
+        payload = await asyncio.to_thread(_run_musicgen_sync, prompt, duration)
+        return payload, errors
+    except Exception as e:
+        errors["musicgen"] = str(e) or type(e).__name__
+
+    # Backend 3: Stable Audio Open (HuggingFace diffusers, local, first load ~3GB, gated model)
+    hf_token = load_settings().get("hf_token") or os.environ.get("HF_TOKEN") or None
+    try:
+        payload = await asyncio.to_thread(_run_stableaudio_sync, prompt, duration, hf_token)
+        return payload, errors
+    except Exception as e:
+        errors["stableaudio"] = str(e) or type(e).__name__
+
+    return None, errors
+
+
 async def api_generate_post(request: Request) -> JSONResponse:
     try:
         body = await request.json()
@@ -204,108 +448,14 @@ async def api_generate_post(request: Request) -> JSONResponse:
     if not isinstance(body, dict):
         return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
     prompt = str(body.get("prompt", body.get("genre", "")))
-    duration = int(body.get("duration", body.get("max_length_seconds", 30)))
-
-    # Try Lyria first (Google Vertex AI, requires GOOGLE_CLOUD_PROJECT env var)
     try:
-        from google import genai
-        from google.genai import types as _genai_types
+        duration = int(body.get("duration", body.get("max_length_seconds", 30)))
+    except (TypeError, ValueError):
+        duration = 30
 
-        project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-        if project:
-            client = genai.Client(vertexai=True, project=project, location="global")
-            import tempfile
-
-            out_dir = tempfile.mkdtemp()
-            out_path = os.path.join(out_dir, "lyria.wav")
-            response = client.models.generate_content(
-                model="lyria-3-pro-preview",
-                contents=prompt,
-                config=_genai_types.GenerateContentConfig(audio_timestamp=True, output_audio_format="wav"),
-            )
-            if response.candidates and response.candidates[0].audio:
-                with open(out_path, "wb") as f:
-                    f.write(response.candidates[0].audio.data)
-                return JSONResponse(
-                    {
-                        "success": True,
-                        "file": out_path,
-                        "duration": duration,
-                        "prompt": prompt,
-                        "model": "lyria-3-pro-preview",
-                        "backend": "lyria",
-                    }
-                )
-    except Exception:
-        pass
-
-    # Try MusicGen (local HuggingFace model, first call downloads ~2GB)
-    try:
-        import scipy.io.wavfile
-        import torch
-        from transformers import AutoProcessor, MusicGenForConditionalGeneration
-
-        processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
-        model = MusicGenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = model.to(device)
-        inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
-        audio_values = model.generate(**inputs, do_sample=True, guidance_scale=3.0, max_new_tokens=duration * 50)
-        import tempfile
-
-        out_dir = tempfile.mkdtemp()
-        out_path = os.path.join(out_dir, "generated.wav")
-        sampling_rate = model.config.audio_encoder.sampling_rate
-        scipy.io.wavfile.write(out_path, rate=sampling_rate, data=audio_values[0, 0].cpu().numpy())
-        return JSONResponse(
-            {
-                "success": True,
-                "file": out_path,
-                "duration": duration,
-                "prompt": prompt,
-                "model": "musicgen-small",
-                "backend": "musicgen",
-            }
-        )
-    except Exception:
-        pass
-
-    # Backend 3: Stable Audio Open (HuggingFace diffusers, local, first load ~3GB)
-    try:
-        import tempfile
-
-        import soundfile as sf
-        import torch
-        from diffusers import StableAudioPipeline
-
-        pipe = StableAudioPipeline.from_pretrained(
-            "stabilityai/stable-audio-open-1.0", torch_dtype=torch.float16, variant="fp16"
-        ).to("cuda")
-        generator = torch.Generator("cuda").manual_seed(0)
-        audio = pipe(
-            prompt,
-            negative_prompt="Low quality.",
-            num_inference_steps=100,
-            audio_end_in_s=min(duration, 47),
-            num_waveforms_per_prompt=1,
-            generator=generator,
-        ).audios
-        out_dir = tempfile.mkdtemp()
-        out_path = os.path.join(out_dir, "stableaudio.wav")
-        output = audio[0].T.float().cpu().numpy()
-        sf.write(out_path, output, pipe.vae.sampling_rate)
-        return JSONResponse(
-            {
-                "success": True,
-                "file": out_path,
-                "duration": min(duration, 47),
-                "prompt": prompt,
-                "model": "stable-audio-open-1.0",
-                "backend": "stableaudio",
-            }
-        )
-    except Exception:
-        pass
+    hit, _local_errors = await _try_local_backends(prompt, duration)
+    if hit is not None:
+        return JSONResponse(hit)
 
     settings = load_settings()
     await ensure_studio_available(_logic.base_url, studio_dir=settings.get("studio_dir"))
@@ -366,6 +516,106 @@ async def api_generate_post(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
+async def api_v1_generate_post(request: Request) -> JSONResponse:
+    """Quick Generate: ``{prompt, duration, lyrics?, model?}``.
+
+    Same local-backend chain as ``/api/generate`` (Lyria -> MusicGen ->
+    Stable Audio), then Studio SG2 as a last resort. Always returns JSON shaped
+    for the Quick page: ``{success, file, backend, model, ...}``.
+    """
+    try:
+        body = await request.json()
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"invalid json: {e}"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
+    prompt = str(body.get("prompt", "") or "")
+    lyrics = str(body.get("lyrics", "") or "")
+    text = prompt.strip() or lyrics.strip()
+    if not text:
+        return JSONResponse({"success": False, "error": "prompt (or lyrics) is required"}, status_code=400)
+    try:
+        duration = int(body.get("duration", 30))
+    except (TypeError, ValueError):
+        duration = 30
+    duration = max(5, min(duration, 600))
+
+    hit, local_errors = await _try_local_backends(text, duration)
+    if hit is not None:
+        return JSONResponse(hit)
+
+    # Last resort: Studio SG2 (async task, no immediate file).
+    settings = load_settings()
+    await ensure_studio_available(_logic.base_url, studio_dir=settings.get("studio_dir"))
+    studio_body: dict[str, object] = {
+        "lyrics": lyrics or text,
+        "genre": "",
+        "mood": "",
+        "title": (prompt[:80] or "Quick Generate"),
+        "max_length_seconds": min(duration, 270),
+    }
+    result = await _logic.generate_song_result(studio_body)
+    if result.get("success"):
+        return JSONResponse(
+            {
+                "success": True,
+                "file": "",
+                "duration": duration,
+                "prompt": text,
+                "backend": "studio",
+                "model": "tencent/SongGeneration::v2-large",
+                "generation_id": result.get("generation_id"),
+                "message": result.get("message"),
+            }
+        )
+    local_errors["studio"] = str(result.get("error", "studio generation failed"))
+    return JSONResponse(
+        {
+            "success": False,
+            "error": result.get("error", "studio generation failed"),
+            "backend": "studio",
+            "backend_errors": local_errors,
+            "hint": (
+                "No generation backend available. Configure one: Lyria project in Settings, "
+                "local MusicGen / Stable Audio deps, or Studio on :10930."
+            ),
+        }
+    )
+
+
+async def api_llm_providers(_request: Request) -> JSONResponse:
+    """Live model lists from local Ollama + LM Studio.
+
+    Short timeouts, never raises: an unreachable provider yields an empty
+    list so the Settings UI shows an honest empty state instead of fakes.
+    """
+    ollama_base = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+    lmstudio_base = os.getenv("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234").rstrip("/")
+    ollama_models: list[dict[str, str]] = []
+    lmstudio_models: list[dict[str, str]] = []
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{ollama_base}/api/tags")
+            if r.status_code == 200:
+                data = r.json()
+                ollama_models = [
+                    {"name": str(m.get("name", ""))} for m in data.get("models", []) if m.get("name")
+                ]
+    except Exception:
+        pass
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{lmstudio_base}/v1/models")
+            if r.status_code == 200:
+                data = r.json()
+                lmstudio_models = [
+                    {"name": str(m.get("id", ""))} for m in data.get("data", []) if m.get("id")
+                ]
+    except Exception:
+        pass
+    return JSONResponse({"ollama": ollama_models, "lm_studio": lmstudio_models})
+
+
 async def api_songs_list(_request: Request) -> JSONResponse:
     return JSONResponse({"entries": list_entries(limit=200)})
 
@@ -378,8 +628,16 @@ async def api_song_get(request: Request) -> JSONResponse:
     return JSONResponse(row)
 
 
+def _redact_settings(data: dict[str, object]) -> dict[str, object]:
+    """Never echo the raw HF token back over HTTP — only whether one is set."""
+    out = dict(data)
+    out["hf_token_configured"] = bool(out.get("hf_token"))
+    out.pop("hf_token", None)
+    return out
+
+
 async def api_settings_get(_request: Request) -> JSONResponse:
-    return JSONResponse(load_settings())
+    return JSONResponse(_redact_settings(load_settings()))
 
 
 async def api_settings_post(request: Request) -> JSONResponse:
@@ -468,13 +726,43 @@ async def api_settings_post(request: Request) -> JSONResponse:
                 {"error": "reaper_api_base must be a string or null"},
                 status_code=400,
             )
+    if "google_cloud_project" in body:
+        v = body.get("google_cloud_project")
+        if v is None or v == "":
+            patch["google_cloud_project"] = None
+        elif isinstance(v, str):
+            patch["google_cloud_project"] = v.strip() or None
+        else:
+            return JSONResponse(
+                {"error": "google_cloud_project must be a string or null"},
+                status_code=400,
+            )
+    if "lyria_model" in body:
+        v = body.get("lyria_model")
+        if v is None or v == "":
+            patch["lyria_model"] = None
+        elif isinstance(v, str):
+            patch["lyria_model"] = v.strip() or None
+        else:
+            return JSONResponse(
+                {"error": "lyria_model must be a string or null"},
+                status_code=400,
+            )
+    if "hf_token" in body:
+        v = body.get("hf_token")
+        if v is None or v == "":
+            patch["hf_token"] = None
+        elif isinstance(v, str):
+            patch["hf_token"] = v.strip() or None
+        else:
+            return JSONResponse({"error": "hf_token must be a string or null"}, status_code=400)
     if not patch:
         return JSONResponse({"error": "no recognized fields"}, status_code=400)
     updated = save_settings(patch)
     if "studio_url" in patch:
         # Hot-reload target without restarting the server process.
         _logic = SongGenerationLogic(base_url=updated.get("studio_url"))
-    return JSONResponse(updated)
+    return JSONResponse(_redact_settings(updated))
 
 
 async def api_export_plex_post(request: Request) -> JSONResponse:
@@ -716,16 +1004,39 @@ app = Starlette(
         Route("/api/studio/status", api_studio_status, methods=["GET"]),
         Route("/api/studio/test", api_studio_test, methods=["GET"]),
         Route("/api/studio/info", api_studio_info, methods=["GET"]),
+        Route("/api/lyria/status", api_lyria_status, methods=["GET"]),
+        Route("/api/huggingface/status", api_huggingface_status, methods=["GET"]),
         Route("/api/generate", api_generate_post, methods=["POST"]),
+        Route("/api/v1/generate", api_v1_generate_post, methods=["POST"]),
         Route("/api/songs", api_songs_list, methods=["GET"]),
         Route("/api/songs/{repo_id}", api_song_get, methods=["GET"]),
         Route("/api/settings", api_settings_get, methods=["GET"]),
         Route("/api/settings", api_settings_post, methods=["POST"]),
+        Route("/api/llm/providers", api_llm_providers, methods=["GET"]),
         Route("/api/export/plex", api_export_plex_post, methods=["POST"]),
         Route("/api/export/virtualdj", api_export_virtualdj_post, methods=["POST"]),
         Route("/api/export/virtualdj/status", api_export_virtualdj_status, methods=["GET"]),
         Route("/api/export/reaper", api_export_reaper_post, methods=["POST"]),
         Route("/api/media/{file_path:path}", api_media_get, methods=["GET"]),
         Mount("/", _mcp_http),
+    ],
+    middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=[
+                "http://localhost:10884",
+                "http://127.0.0.1:10884",
+                "http://goliath:10884",
+                "http://localhost:10885",
+                "http://127.0.0.1:10885",
+                "http://goliath:10885",
+                "http://tauri.localhost",
+                "https://tauri.localhost",
+                "tauri://localhost",
+            ],
+            allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|goliath|tauri\.localhost)(:\\d+)?",
+            allow_methods=["*"],
+            allow_headers=["*"],
+        ),
     ],
 )

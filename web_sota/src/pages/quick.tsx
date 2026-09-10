@@ -1,8 +1,7 @@
 import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { API_BASE } from "../lib/api";
 import { Music, Wand2, Loader2, Check, Sparkles } from "lucide-react";
-import { postQuickGenerate } from "../lib/api";
+import { postQuickGenerate, type QuickGenerateResponse } from "../lib/api";
 
 const BACKENDS = [
   { id: "lyria", name: "Lyria 3 Pro", quality: "Best", icon: "✨" },
@@ -15,7 +14,7 @@ export default function QuickGenerate() {
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(30);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{file: string; backend: string; model: string} | null>(null);
+  const [result, setResult] = useState<QuickGenerateResponse | null>(null);
   const [error, setError] = useState("");
   const [activeBackend, setActiveBackend] = useState<string | null>(null);
 
@@ -29,8 +28,9 @@ export default function QuickGenerate() {
       if (data.success) {
         setResult(data);
         setActiveBackend(data.backend);
+        if (!data.file && data.message) setError("");
       } else {
-        setError(data.error || "Generation failed");
+        setError([data.error, data.hint].filter(Boolean).join(" "));
       }
     } catch (e: any) {
       setError(e.message || "Connection failed");
@@ -117,16 +117,29 @@ export default function QuickGenerate() {
               <div>
                 <p className="text-sm text-slate-200">Generated</p>
                 <p className="text-[10px] text-slate-500">via {result.backend} · {result.model}</p>
+                {result.generation_id && (
+                  <p className="text-[10px] text-slate-500 font-mono">task {result.generation_id}</p>
+                )}
+                {result.message && (
+                  <p className="text-xs text-slate-400 mt-1">{result.message}</p>
+                )}
+                {result.file ? (
+                  <p className="text-[10px] text-slate-500 font-mono break-all">{result.file}</p>
+                ) : (
+                  <p className="text-xs text-slate-500 mt-1">No audio file yet — Studio renders async. Pick it up on Generate / Listen.</p>
+                )}
               </div>
             </div>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4].map((d) => (
-                <button key={d} onClick={() => loadToDeck(d)}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-mono transition-colors">
-                  Load D{d}
-                </button>
-              ))}
-            </div>
+            {result.file && (
+              <div className="flex gap-1">
+                {[1, 2, 3, 4].map((d) => (
+                  <button key={d} onClick={() => loadToDeck(d)}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-mono transition-colors">
+                    Load D{d}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </motion.div>
       )}

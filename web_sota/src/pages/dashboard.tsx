@@ -31,7 +31,7 @@ export function Dashboard() {
         } catch {
             setHealthOk(false);
             setHealthDetail("");
-            setErr("Cannot reach /api/health — start the backend (web_sota/start.ps1).");
+            setErr("Cannot reach /api/health — backend down. Run .\\start.ps1 at the repo root, or .\\web_sota\\start.ps1 (Vite proxy needs backend on :10885).");
         }
         try {
             const lg = await fetchLogs(12);
