@@ -1,4 +1,4 @@
-"""SongGeneration v2 (LeVo 2 / SG2) helpers — lyrics rules and tag reference."""
+"""SongGeneration v2 (LeVo 2 / SG2) helpers - lyrics rules and tag reference."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 # Length-sensitive structural markers (embed in lyrics text for SG2).
 SG2_STRUCTURAL_TAGS_REFERENCE = """
 SG2 length-sensitive section markers (use inside lyrics):
-- [intro-short]  (0–10s)    [intro-medium]  (10–20s)
+- [intro-short]  (0-10s)    [intro-medium]  (10-20s)
 - [inst-short]                 [inst-medium]
 - [outro-short]               [outro-medium]
 

@@ -24,9 +24,7 @@ SONG_REQUEST_SCHEMA = {
         "title": {"type": "string", "description": "Title of the song"},
         "lyrics": {
             "type": "string",
-            "description": (
-                "Complete lyrics (SG2: length tags; English lines end with '.' before ';')"
-            ),
+            "description": ("Complete lyrics (SG2: length tags; English lines end with '.' before ';')"),
         },
         "genre": {"type": "string", "description": "Musical genre"},
         "emotion": {"type": "string", "description": "Musical emotion/mood"},
@@ -39,9 +37,7 @@ SONG_REQUEST_SCHEMA = {
         "torch_dtype": {"type": "string", "default": "bfloat16"},
         "style_audio_prompt_path": {
             "type": "string",
-            "description": (
-                "Optional path to ~10s audio on the Studio host for style cloning (Style RAG)"
-            ),
+            "description": ("Optional path to ~10s audio on the Studio host for style cloning (Style RAG)"),
         },
         "mix_dual_tracks": {"type": "boolean", "default": False},
     },
@@ -51,7 +47,7 @@ SONG_REQUEST_SCHEMA = {
 app = FastMCP(
     "songgeneration-mcp",
     instructions=(
-        "SongGeneration SOTA MCP — Tencent SongGeneration v2 (LeVo 2, open weights) via "
+        "SongGeneration SOTA MCP - Tencent SongGeneration v2 (LeVo 2, open weights) via "
         "SongGeneration-Studio. Default tencent/SongGeneration v2-large; max_length 270s; "
         "bfloat16; 48 kHz dual-track (vocal.wav / inst.wav). SG2 lyrics rules apply. "
         "Resource docs://lyria-vs-sg2 compares local SG2 to cloud Gemini Lyria 3 Pro (~Mar 2026)."
@@ -140,20 +136,20 @@ async def help(level: str = "basic", topic: str | None = None) -> str:
         return """\
 # songgeneration-mcp
 
-Tencent SongGeneration v2 (LeVo 2 / SG2) via SongGeneration-Studio — local open-weight music generation.
+Tencent SongGeneration v2 (LeVo 2 / SG2) via SongGeneration-Studio - local open-weight music generation.
 
 ## Tools
-- `generate_song` — generate a song from lyrics + style parameters
-- `list_models` — list models available in Studio
-- `get_status` — GPU VRAM and generation queue state
-- `cancel_generation` — stop an active task
-- `unload_models` — free VRAM
-- `diagnostics` — server diagnostic report
-- `help` — this help (level="basic"|"intermediate"|"advanced", topic="lyria")
+- `generate_song` - generate a song from lyrics + style parameters
+- `list_models` - list models available in Studio
+- `get_status` - GPU VRAM and generation queue state
+- `cancel_generation` - stop an active task
+- `unload_models` - free VRAM
+- `diagnostics` - server diagnostic report
+- `help` - this help (level="basic"|"intermediate"|"advanced", topic="lyria")
 
 ## Key facts
 - Dual-track output: `vocal.wav` + `inst.wav` at 48 kHz (native codec stems, not post-hoc separation)
-- Section timing: embed SG2 length tags in lyrics — `[intro-short]`, `[inst-medium]`, `[outro-long]`, etc.
+- Section timing: embed SG2 length tags in lyrics - `[intro-short]`, `[inst-medium]`, `[outro-long]`, etc.
 - Style cloning: pass a ~10s WAV path as `style_audio_prompt_path`
 - Studio must be running locally (port 10930) or configured via `studio_url`
 
@@ -164,17 +160,17 @@ See `help(topic="lyria")` or MCP resource `docs://lyria-vs-sg2` for the full com
 """
     elif level == "intermediate":
         return """\
-# songgeneration-mcp — Intermediate Help
+# songgeneration-mcp - Intermediate Help
 
 ## Generation workflow
-1. `list_models` — confirm what's loaded in Studio
-2. `generate_song(lyrics=..., genre=..., mood=...)` — start generation
-3. `get_status` — monitor VRAM and queue
-4. `unload_models` — free VRAM when done
+1. `list_models` - confirm what's loaded in Studio
+2. `generate_song(lyrics=..., genre=..., mood=...)` - start generation
+3. `get_status` - monitor VRAM and queue
+4. `unload_models` - free VRAM when done
 
 ## Lyrics format (SG2)
 Use `;` as section separator. Embed length tags for timing control:
-  `[intro-short]` (0–10s) · `[intro-medium]` (10–20s)
+  `[intro-short]` (0-10s) · `[intro-medium]` (10-20s)
   `[inst-short]` · `[inst-medium]`
   `[outro-short]` · `[outro-medium]`
 
@@ -189,7 +185,7 @@ generation on that reference clip's timbre and production style.
 
 ## Exports
 - Plex: `POST /api/export/plex` with repo_id
-- VirtualDJ: `POST /api/export/virtualdj` — deck, auto_play, sync_to_master, cue_at_start
+- VirtualDJ: `POST /api/export/virtualdj` - deck, auto_play, sync_to_master, cue_at_start
 - Reaper: `POST /api/export/reaper` with repo_id
 
 ## SG2 vs Lyria
@@ -197,7 +193,7 @@ generation on that reference clip's timbre and production style.
 """
     else:
         return """\
-# songgeneration-mcp — Advanced Help
+# songgeneration-mcp - Advanced Help
 
 ## Under the hood
 
@@ -206,7 +202,7 @@ The MCP server wraps SongGeneration-Studio's REST API. `generate_song` builds an
 and POSTs to Studio's `/api/generate`. Studio manages the model-server subprocess and GPU queue.
 
 Generation produces discrete codec tokens for two streams (vocal, instrumental), decoded to
-48 kHz stereo WAVs. The dual-track output is not post-hoc separation — it is the model's native
+48 kHz stereo WAVs. The dual-track output is not post-hoc separation - it is the model's native
 output, so stems are phase-coherent with the mix.
 
 ## SG2 architecture
@@ -229,8 +225,8 @@ output, so stems are phase-coherent with the mix.
 
 ## API endpoints (Starlette ASGI, port 10885)
 - GET  /api/health
-- GET  /api/studio/status — Studio reachability + generation queue
-- GET  /api/studio/test  — deep check: dir, HTTP, GPU, model-server, models
+- GET  /api/studio/status - Studio reachability + generation queue
+- GET  /api/studio/test  - deep check: dir, HTTP, GPU, model-server, models
 - GET  /api/studio/info
 - POST /api/generate
 - GET  /api/songs  ·  GET /api/songs/{repo_id}
@@ -238,7 +234,7 @@ output, so stems are phase-coherent with the mix.
 - POST /api/export/plex  ·  /api/export/virtualdj  ·  /api/export/reaper
 - GET  /api/export/virtualdj/status
 - GET  /api/media/{file_path:path}
-- *    /mcp  — MCP streamable-HTTP transport
+- *    /mcp  - MCP streamable-HTTP transport
 
 Full doc: resource `docs://lyria-vs-sg2`, file `docs/LYRIA_VS_SG2.md`
 """
@@ -275,7 +271,7 @@ async def generate_song(
     mix_dual_tracks: bool = False,
     auto_fix_english_punctuation: bool = True,
 ) -> str:
-    """GENERATE_SONG — Start LeVo 2 (SongGeneration v2) generation via SongGeneration-Studio.
+    """GENERATE_SONG - Start LeVo 2 (SongGeneration v2) generation via SongGeneration-Studio.
 
     PORTMANTEAU PATTERN RATIONALE: One MCP entry point for lyrics, SG2 inference flags,
     dual-track output, and optional Style RAG (10s audio prompt), matching fleet docstring style.
@@ -285,7 +281,7 @@ async def generate_song(
             sections. For English, each line should end with '.' before ';' (optional auto-fix).
         genre: Musical genre (e.g. Rock, Pop).
         mood: Emotional vibe.
-        tempo: BPM (about 60–180).
+        tempo: BPM (about 60-180).
         voice: "Male" or "Female".
         structure: Section order hint for the client (passed through for future Studio use).
         separate_stems: If True (default), request dual-track output (vocal.wav + inst.wav).
@@ -332,11 +328,7 @@ async def get_status() -> str:
         Formatted Markdown report of the system status.
     """
     status_data = await logic.get_status()
-    vram_percent = (
-        (status_data["vram_used"] / status_data["vram_total"] * 100)
-        if status_data["vram_total"] > 0
-        else 0
-    )
+    vram_percent = (status_data["vram_used"] / status_data["vram_total"] * 100) if status_data["vram_total"] > 0 else 0
 
     return f"""# SongGeneration System Status
 > [!NOTE]

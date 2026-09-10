@@ -1,4 +1,4 @@
-"""LeVo 2 (SG2) vs Gemini Lyria 3 Pro — text for MCP resource and help.
+"""LeVo 2 (SG2) vs Gemini Lyria 3 Pro - text for MCP resource and help.
 
 The canonical comparison doc lives at ``docs/LYRIA_VS_SG2.md``.
 ``get_lyria_vs_sg2_text()`` reads that file when running from the repo;
@@ -13,7 +13,7 @@ from pathlib import Path
 LYRIA_VS_SG2_MARKDOWN = """\
 # LeVo 2 (SG2) vs Gemini Lyria 3 Pro
 
-*Pricing and model SKUs change — always verify current Google terms.*
+*Pricing and model SKUs change - always verify current Google terms.*
 
 ## TL;DR
 
@@ -34,7 +34,7 @@ LYRIA_VS_SG2_MARKDOWN = """\
 | **Stems** | vocal.wav + inst.wav native | Single mix (no native stems) |
 | **Section control** | Length tags in lyrics | Prompt wording only |
 | **Training priors** | Tencent catalog, C-pop | Google-licensed, Western pop/rock |
-| **Latency** | 2–10 min (RTX 4090) | Seconds to ~2 min (cloud) |
+| **Latency** | 2-10 min (RTX 4090) | Seconds to ~2 min (cloud) |
 | **VRAM** | ~22 GB (v2-large, bfloat16) | None (cloud) |
 
 ## When to pick which

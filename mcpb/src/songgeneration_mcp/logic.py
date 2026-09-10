@@ -88,29 +88,17 @@ class SongGenerationLogic:
         """Map MCP args + SG2 defaults to the Studio JSON body (forward-compatible)."""
         auto_fix = bool(request_data.get("auto_fix_english_punctuation", True))
         raw_lyrics = request_data.get("lyrics") or ""
-        lyrics_norm, punct_notes = normalize_sg2_english_before_semicolons(
-            raw_lyrics, auto_fix=auto_fix
-        )
+        lyrics_norm, punct_notes = normalize_sg2_english_before_semicolons(raw_lyrics, auto_fix=auto_fix)
 
         separate = bool(request_data.get("separate_stems", True))
         mix_dual = bool(request_data.get("mix_dual_tracks", False))
 
-        model_repo = (
-            request_data.get("model_repo") or os.getenv("SONGGEN_MODEL_REPO") or _DEFAULT_MODEL_REPO
-        )
-        weights = (
-            request_data.get("model_weights")
-            or os.getenv("SONGGEN_MODEL_WEIGHTS")
-            or _DEFAULT_WEIGHTS
-        )
+        model_repo = request_data.get("model_repo") or os.getenv("SONGGEN_MODEL_REPO") or _DEFAULT_MODEL_REPO
+        weights = request_data.get("model_weights") or os.getenv("SONGGEN_MODEL_WEIGHTS") or _DEFAULT_WEIGHTS
         max_length_seconds = int(
-            request_data.get("max_length_seconds")
-            or os.getenv("SONGGEN_MAX_LENGTH_SECONDS")
-            or _DEFAULT_MAX_LENGTH_S
+            request_data.get("max_length_seconds") or os.getenv("SONGGEN_MAX_LENGTH_SECONDS") or _DEFAULT_MAX_LENGTH_S
         )
-        torch_dtype = (
-            request_data.get("torch_dtype") or os.getenv("SONGGEN_TORCH_DTYPE") or _DEFAULT_DTYPE
-        )
+        torch_dtype = request_data.get("torch_dtype") or os.getenv("SONGGEN_TORCH_DTYPE") or _DEFAULT_DTYPE
 
         style_path = request_data.get("style_audio_prompt_path")
 

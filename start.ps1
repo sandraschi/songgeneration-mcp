@@ -13,7 +13,8 @@ foreach ($port in @($BackendPort, $FrontendPort)) {
 Start-Sleep 1
 
 Write-Host "-> Starting backend on port $BackendPort..." -ForegroundColor Yellow
-$BackendProc = Start-Process -NoNewWindow -PassThru -FilePath "uv" -ArgumentList @(
+$UvBin = "C:\Users\sandr\.local\bin\uv.exe"
+$BackendProc = Start-Process -NoNewWindow -PassThru -FilePath $UvBin -ArgumentList @(
     "run", "uvicorn", "songgeneration_mcp.server:app", "--port", "$BackendPort", "--host", "127.0.0.1"
 ) -WorkingDirectory $ScriptRoot
 

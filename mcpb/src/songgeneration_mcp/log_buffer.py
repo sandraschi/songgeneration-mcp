@@ -6,7 +6,7 @@ import logging
 import os
 import threading
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 _lock = threading.Lock()
@@ -22,7 +22,7 @@ class RingBufferHandler(logging.Handler):
         try:
             msg = self.format(record)
             entry: dict[str, Any] = {
-                "ts": datetime.fromtimestamp(record.created, tz=timezone.utc)
+                "ts": datetime.fromtimestamp(record.created, tz=UTC)
                 .isoformat(timespec="milliseconds")
                 .replace("+00:00", "Z"),
                 "level": record.levelname.lower(),
@@ -45,9 +45,7 @@ def setup_process_log_buffer() -> None:
         return
     handler = RingBufferHandler()
     handler.setLevel(logging.DEBUG)
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-    )
+    handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
 
     root = logging.getLogger()
     if not any(isinstance(h, RingBufferHandler) for h in root.handlers):

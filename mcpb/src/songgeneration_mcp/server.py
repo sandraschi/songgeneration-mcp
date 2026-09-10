@@ -7,6 +7,7 @@ for the web UI: generate, Studio status, song repository.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import httpx
@@ -65,9 +66,7 @@ async def api_logs_get(request: Request) -> JSONResponse:
 
 async def api_logs_clear(_request: Request) -> JSONResponse:
     removed = clear_buffer()
-    logging.getLogger(__name__).warning(
-        "Log buffer cleared by operator (%s entries removed).", removed
-    )
+    logging.getLogger(__name__).warning("Log buffer cleared by operator (%s entries removed).", removed)
     return JSONResponse({"cleared": removed})
 
 
@@ -94,14 +93,17 @@ async def api_studio_test(_request: Request) -> JSONResponse:
     if studio_dir:
         main_py = _Path(studio_dir) / "main.py"
         dir_ok = main_py.is_file()
-    checks.append({
-        "name": "studio_dir",
-        "ok": dir_ok,
-        "detail": studio_dir if studio_dir else "not configured",
-    })
+    checks.append(
+        {
+            "name": "studio_dir",
+            "ok": dir_ok,
+            "detail": studio_dir if studio_dir else "not configured",
+        }
+    )
 
-    # 2. HTTP reachable — /api/health
+    # 2. HTTP reachable - /api/health
     import httpx as _httpx
+
     health_ok = False
     health_detail = ""
     try:
@@ -126,8 +128,8 @@ async def api_studio_test(_request: Request) -> JSONResponse:
                     if gpu_ok:
                         g = gd.get("gpu", {})
                         gpu_detail = (
-                            f"{g.get('name','?')} — "
-                            f"{g.get('free_gb','?')} GB free / {g.get('total_gb','?')} GB total"
+                            f"{g.get('name', '?')} - "
+                            f"{g.get('free_gb', '?')} GB free / {g.get('total_gb', '?')} GB total"
                         )
                     else:
                         gpu_detail = gd.get("error") or "GPU not available"
@@ -147,7 +149,7 @@ async def api_studio_test(_request: Request) -> JSONResponse:
                     ms_ok = ms.get("running", False)
                     if ms_ok:
                         loaded = ms.get("model_id") if ms.get("loaded") else None
-                        ms_detail = f"running — model: {loaded or 'none loaded'}"
+                        ms_detail = f"running - model: {loaded or 'none loaded'}"
                     else:
                         ms_detail = ms.get("error") or "not running"
         except Exception as exc:
@@ -171,18 +173,18 @@ async def api_studio_test(_request: Request) -> JSONResponse:
     checks.append({"name": "models_ready", "ok": model_ok, "detail": model_detail})
 
     overall = all(c["ok"] for c in checks)
-    return JSONResponse({
-        "ok": overall,
-        "studio_url": studio_url,
-        "checks": checks,
-    })
+    return JSONResponse(
+        {
+            "ok": overall,
+            "studio_url": studio_url,
+            "checks": checks,
+        }
+    )
 
 
 async def api_studio_info(_request: Request) -> JSONResponse:
     settings = load_settings()
-    reachable = await ensure_studio_available(
-        _logic.base_url, studio_dir=settings.get("studio_dir")
-    )
+    reachable = await ensure_studio_available(_logic.base_url, studio_dir=settings.get("studio_dir"))
     status = await _logic.get_status()
     return JSONResponse(
         {
@@ -201,6 +203,110 @@ async def api_generate_post(request: Request) -> JSONResponse:
         return JSONResponse({"success": False, "error": f"invalid json: {e}"}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
+    prompt = str(body.get("prompt", body.get("genre", "")))
+    duration = int(body.get("duration", body.get("max_length_seconds", 30)))
+
+    # Try Lyria first (Google Vertex AI, requires GOOGLE_CLOUD_PROJECT env var)
+    try:
+        from google import genai
+        from google.genai import types as _genai_types
+
+        project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+        if project:
+            client = genai.Client(vertexai=True, project=project, location="global")
+            import tempfile
+
+            out_dir = tempfile.mkdtemp()
+            out_path = os.path.join(out_dir, "lyria.wav")
+            response = client.models.generate_content(
+                model="lyria-3-pro-preview",
+                contents=prompt,
+                config=_genai_types.GenerateContentConfig(audio_timestamp=True, output_audio_format="wav"),
+            )
+            if response.candidates and response.candidates[0].audio:
+                with open(out_path, "wb") as f:
+                    f.write(response.candidates[0].audio.data)
+                return JSONResponse(
+                    {
+                        "success": True,
+                        "file": out_path,
+                        "duration": duration,
+                        "prompt": prompt,
+                        "model": "lyria-3-pro-preview",
+                        "backend": "lyria",
+                    }
+                )
+    except Exception:
+        pass
+
+    # Try MusicGen (local HuggingFace model, first call downloads ~2GB)
+    try:
+        import scipy.io.wavfile
+        import torch
+        from transformers import AutoProcessor, MusicGenForConditionalGeneration
+
+        processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
+        model = MusicGenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = model.to(device)
+        inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
+        audio_values = model.generate(**inputs, do_sample=True, guidance_scale=3.0, max_new_tokens=duration * 50)
+        import tempfile
+
+        out_dir = tempfile.mkdtemp()
+        out_path = os.path.join(out_dir, "generated.wav")
+        sampling_rate = model.config.audio_encoder.sampling_rate
+        scipy.io.wavfile.write(out_path, rate=sampling_rate, data=audio_values[0, 0].cpu().numpy())
+        return JSONResponse(
+            {
+                "success": True,
+                "file": out_path,
+                "duration": duration,
+                "prompt": prompt,
+                "model": "musicgen-small",
+                "backend": "musicgen",
+            }
+        )
+    except Exception:
+        pass
+
+    # Backend 3: Stable Audio Open (HuggingFace diffusers, local, first load ~3GB)
+    try:
+        import tempfile
+
+        import soundfile as sf
+        import torch
+        from diffusers import StableAudioPipeline
+
+        pipe = StableAudioPipeline.from_pretrained(
+            "stabilityai/stable-audio-open-1.0", torch_dtype=torch.float16, variant="fp16"
+        ).to("cuda")
+        generator = torch.Generator("cuda").manual_seed(0)
+        audio = pipe(
+            prompt,
+            negative_prompt="Low quality.",
+            num_inference_steps=100,
+            audio_end_in_s=min(duration, 47),
+            num_waveforms_per_prompt=1,
+            generator=generator,
+        ).audios
+        out_dir = tempfile.mkdtemp()
+        out_path = os.path.join(out_dir, "stableaudio.wav")
+        output = audio[0].T.float().cpu().numpy()
+        sf.write(out_path, output, pipe.vae.sampling_rate)
+        return JSONResponse(
+            {
+                "success": True,
+                "file": out_path,
+                "duration": min(duration, 47),
+                "prompt": prompt,
+                "model": "stable-audio-open-1.0",
+                "backend": "stableaudio",
+            }
+        )
+    except Exception:
+        pass
+
     settings = load_settings()
     await ensure_studio_available(_logic.base_url, studio_dir=settings.get("studio_dir"))
     result = await _logic.generate_song_result(body)
@@ -253,14 +359,10 @@ async def api_generate_post(request: Request) -> JSONResponse:
                     role_urls = list(result.get("stem_urls", {}).get(role) or [])
                     if not role_urls:
                         continue
-                    role_mp3 = await transcode_audio_urls_to_mp3(
-                        role_urls, f"{entry['repo_id']}-{role}"
-                    )
+                    role_mp3 = await transcode_audio_urls_to_mp3(role_urls, f"{entry['repo_id']}-{role}")
                     mp3_stem_urls[role] = role_mp3
                 result["mp3_stem_urls"] = mp3_stem_urls
-                update_entry(
-                    entry["repo_id"], {"mp3_urls": mp3_urls, "mp3_stem_urls": mp3_stem_urls}
-                )
+                update_entry(entry["repo_id"], {"mp3_urls": mp3_urls, "mp3_stem_urls": mp3_stem_urls})
     return JSONResponse(result)
 
 
@@ -464,16 +566,12 @@ async def api_export_virtualdj_post(request: Request) -> JSONResponse:
                     f"{vdj_base}/api/v1/deck/{deck}/play_pause",
                     params={"action": "play"},
                 )
-                play_is_json = play_res.headers.get("content-type", "").startswith(
-                    "application/json"
-                )
+                play_is_json = play_res.headers.get("content-type", "").startswith("application/json")
                 play_data = play_res.json() if play_is_json else {"raw": play_res.text}
             sync_data: dict[str, object] | None = None
             if sync_to_master:
                 sync_res = await client.post(f"{vdj_base}/api/v1/deck/{deck}/sync")
-                sync_is_json = sync_res.headers.get("content-type", "").startswith(
-                    "application/json"
-                )
+                sync_is_json = sync_res.headers.get("content-type", "").startswith("application/json")
                 sync_data = sync_res.json() if sync_is_json else {"raw": sync_res.text}
             cue_data: dict[str, object] | None = None
             if cue_at_start:
@@ -481,9 +579,7 @@ async def api_export_virtualdj_post(request: Request) -> JSONResponse:
                     f"{vdj_base}/api/v1/deck/{deck}/cue",
                     params={"mode": "start"},
                 )
-                cue_is_json = cue_res.headers.get("content-type", "").startswith(
-                    "application/json"
-                )
+                cue_is_json = cue_res.headers.get("content-type", "").startswith("application/json")
                 cue_data = cue_res.json() if cue_is_json else {"raw": cue_res.text}
             return JSONResponse(
                 {

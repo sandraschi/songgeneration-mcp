@@ -169,7 +169,7 @@ def add_generation_entry(
         "stem_urls": stem_urls,
         "punctuation_notes": punctuation_notes,
     }
-    # Avoid huge JSON on disk — keep a slim snapshot
+    # Avoid huge JSON on disk - keep a slim snapshot
     slim: dict[str, Any] = {}
     for key in ("status", "state", "progress", "outputs", "files", "paths", "result", "error"):
         if key in studio_response:
