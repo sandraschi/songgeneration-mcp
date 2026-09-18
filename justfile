@@ -31,18 +31,11 @@ test:
 
 # Lint
 lint:
-    Set-Location '{{justfile_directory()}}'
-    uv run ruff check src/
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npx @biomejs/biome ci .
+    Set-Location '{{justfile_directory()}}'; uv run ruff check src/; Set-Location '{{justfile_directory()}}\web_sota'; npx @biomejs/biome ci .
 
 # Fix
 fix:
-    Set-Location '{{justfile_directory()}}'
-    uv run ruff check src/ --fix --unsafe-fixes
-    uv run ruff format src/
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npx @biomejs/biome check --write .
+    Set-Location '{{justfile_directory()}}'; uv run ruff check src/ --fix --unsafe-fixes; uv run ruff format src/; Set-Location '{{justfile_directory()}}\web_sota'; npx @biomejs/biome check --write .
 
 # Bootstrap: install dev deps + pre-commit hook
 bootstrap:
