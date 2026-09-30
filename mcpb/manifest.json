@@ -6,10 +6,10 @@
   "author": { "name": "sandraschi" },
   "server": {
     "type": "python",
-    "entry_point": "src/songgeneration_mcp/server.py",
+    "entry_point": "src/songgeneration_mcp/mcp_server.py",
     "mcp_config": {
       "command": "uv",
-      "args": ["run","--directory","${PWD}","python","-m","songgeneration_mcp"],
+      "args": ["run","--directory","${PWD}","python","-m","songgeneration_mcp.mcp_server"],
       "env": {
         "PYTHONPATH": "${PWD}/src",
         "PYTHONUNBUFFERED": "1"

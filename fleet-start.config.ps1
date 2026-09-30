@@ -5,7 +5,7 @@
     BackendPort  = 10885
     FrontendPort = 10884
     HealthPath   = '/api/health'
-    WebRoot      = 'D:\Dev\repos\songgeneration-mcp\web_sota'
+    WebRoot      = 'web_sota'
     Backend = @{
         Kind          = 'uvicorn'
         UvicornTarget = 'songgeneration_mcp.server:app'
