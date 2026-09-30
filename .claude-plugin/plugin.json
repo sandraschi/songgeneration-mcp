@@ -1,0 +1,10 @@
+{
+  "name": "songgeneration-mcp",
+  "version": "0.1.0",
+  "description": "Local open-weight music generation: Tencent SG2/LeVo2 via Studio, plus Lyria, ACE-Step, MusicGen and Stable Audio backends. Stems, style cloning, Plex/VirtualDJ/Reaper handoffs.",
+  "author": "Sandra Schipal",
+  "repository": "https://github.com/sandraschi/songgeneration-mcp",
+  "license": "MIT",
+  "hooks": "../hooks/hooks.json",
+  "keywords": ["music", "generation", "songgeneration", "levo", "stems", "mcp"]
+}

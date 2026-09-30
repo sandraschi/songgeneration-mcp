@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "text",
+            "text": "## Session Context (songgeneration-mcp)\n\nBackends tried in order: Lyria (cloud, needs GCP) → ACE-Step (:8001) → MusicGen → Stable Audio → Studio SG2 (:10930). Check `GET /api/v1/diagnostics` before promising generation. Lyrics format: `;` separators, English lines end with `.` before `;`, SG2 length tags for timing. Skill: `skills/SKILL.md`. Never invent model names - `list_models` first."
+          }
+        ]
+      }
+    ]
+  }
+}

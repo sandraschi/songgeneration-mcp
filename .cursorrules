@@ -1,0 +1,12 @@
+# songgeneration-mcp — Cursor rules
+
+## Session Context
+Backends tried in order: Lyria (cloud/GCP) → ACE-Step (:8001) → MusicGen →
+Stable Audio → Studio SG2 (:10930). Check `GET /api/v1/diagnostics` before
+promising generation. Lyrics: `;` separators, English lines end with `.`
+before `;`, SG2 length tags for timing. Skill: `skills/SKILL.md`.
+
+## Commands
+- `just serve` backend :10885 · `just test` pytest · `just lint` ruff+biome
+- Never use bare `python`/`uv`/`rg`/`git` — full paths per fleet AGENTS.md.
+- ≤5 files per commit; timestamped `.bak` before 3+ file edits.
