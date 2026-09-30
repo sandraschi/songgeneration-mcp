@@ -236,7 +236,7 @@ export function Listen() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="listen">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
@@ -386,9 +386,7 @@ export function Listen() {
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={
-                    !current?.mp3_urls?.length || !plexConfigured
-                  }
+                  disabled={!current?.mp3_urls?.length || !plexConfigured}
                   onClick={() => void onExportOne()}
                   title={
                     !plexConfigured

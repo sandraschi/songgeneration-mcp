@@ -167,7 +167,10 @@ export function Logger() {
                 </p>
               ) : (
                 filtered.map((l) => (
-                  <p key={`${l.ts}-${l.message.slice(0, 32)}`} className={levelStyle(l.level)}>
+                  <p
+                    key={`${l.ts}-${l.message.slice(0, 32)}`}
+                    className={levelStyle(l.level)}
+                  >
                     <span className="text-slate-500">{l.ts}</span>{" "}
                     <span className="text-slate-600">[{l.level}]</span>{" "}
                     <span className="text-slate-500">{l.logger}</span>{" "}

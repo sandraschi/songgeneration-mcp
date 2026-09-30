@@ -151,7 +151,7 @@ export function Generate() {
   ] as const;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="generate">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-white">
           Generate
