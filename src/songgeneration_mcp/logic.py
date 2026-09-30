@@ -49,8 +49,8 @@ class SongGenerationLogic:
             response.raise_for_status()
             data = response.json()
             return [m["id"] for m in data.get("models", [])]
-        except Exception as e:
-            logger.error(f"Failed to list models: {e}")
+        except Exception:
+            logger.exception("Failed to list models")
             return []
 
     async def get_status(self) -> dict[str, Any]:
@@ -75,7 +75,7 @@ class SongGenerationLogic:
                 "model_loaded": state_data.get("model_id") if state_data.get("loaded") else None,
             }
         except Exception as e:
-            logger.error(f"Failed to get status: {e}")
+            logger.exception("Failed to get status")
             return {
                 "vram_total": 0,
                 "vram_used": 0,
@@ -272,8 +272,8 @@ class SongGenerationLogic:
             if response.status_code == 200:
                 return True
             return False
-        except Exception as e:
-            logger.error(f"Failed to cancel generation {task_id}: {e}")
+        except Exception:
+            logger.exception("Failed to cancel generation %s", task_id)
             return False
 
     async def unload_models(self) -> bool:
@@ -282,6 +282,6 @@ class SongGenerationLogic:
             client = await self.get_client()
             response = await client.post("/model-server/unload")
             return response.status_code == 200
-        except Exception as e:
-            logger.error(f"Failed to unload models: {e}")
+        except Exception:
+            logger.exception("Failed to unload models")
             return False

@@ -217,7 +217,23 @@ async def run_server_async(mcp_app, args: argparse.Namespace | None = None, serv
             path = config["path"]
             endpoint = f"http://{host}:{port}{path}"
             logger.info(f"Running in HTTP Streamable mode: {endpoint}")
-            await mcp_app.run_http_async(host=host, port=port, path=path)
+            # NOTE (assfix 2026-10-01): run_http_async drops CORSMiddleware, so the
+            # web dashboard on another port gets blocked. Serve mcp.http_app()
+            # via uvicorn with explicit CORS instead. Diverges from the vendored
+            # fleet template on purpose -- mirror this to mcp-central-docs.
+            import uvicorn
+            from starlette.middleware.cors import CORSMiddleware as _CORS
+
+            _http = mcp_app.http_app(path=path, transport="streamable-http")
+            _http.add_middleware(
+                _CORS,
+                allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|goliath|tauri\.localhost)(:\d+)?",
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
+            _config = uvicorn.Config(_http, host=host, port=port, log_level="info")
+            _server = uvicorn.Server(_config)
+            await _server.serve()
 
         elif transport == "sse":
             host = config["host"]

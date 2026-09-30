@@ -70,7 +70,7 @@ class AcestepClient:
             data = response.json().get("data") or {}
             return [m["name"] for m in data.get("models", [])]
         except Exception as exc:
-            logger.error("Failed to list ACE-Step models: %s", exc)
+            logger.exception("Failed to list ACE-Step models: %s", exc)
             return []
 
     async def generate(

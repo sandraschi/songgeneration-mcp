@@ -11,6 +11,7 @@ import logging
 import mimetypes
 import os
 import shutil
+import threading
 from pathlib import Path
 
 import httpx
@@ -220,7 +221,8 @@ def _check_lyria_adc() -> tuple[bool, str, str | None]:
             if not os.path.isfile(_cloud_sdk.get_application_default_credentials_path()):
                 return False, "no Application Default Credentials file found", None
         except Exception:
-            pass  # internal helper unavailable/changed -- fall through to the real check
+            # internal helper unavailable/changed -- fall through to the real check
+            logging.getLogger(__name__).debug("google.auth _cloud_sdk helper unavailable", exc_info=True)
     try:
         import google.auth
         from google.auth.transport.requests import Request as _GoogleAuthRequest
@@ -389,7 +391,7 @@ def _run_stableaudio_sync(prompt: str, duration: int, hf_token: str | None) -> d
 
 
 async def _try_local_backends(prompt: str, duration: int) -> tuple[dict[str, object] | None, dict[str, str]]:
-    """Quick-chain: Lyria -> MusicGen -> Stable Audio Open.
+    """Quick-chain: Lyria -> ACE-Step -> MusicGen -> Stable Audio Open.
 
     Each backend's actual model/API call is synchronous and can run for
     minutes (first-run downloads, GPU inference) -- every one runs via
@@ -422,14 +424,46 @@ async def _try_local_backends(prompt: str, duration: int) -> tuple[dict[str, obj
             errors["lyria"] = str(e) or type(e).__name__
             log.exception("Lyria generation failed; falling back to next backend.")
 
-    # Backend 2: MusicGen (local HuggingFace model, first call downloads ~2GB)
+    # Backend 2: ACE-Step 1.5 (local API server, full songs with vocals, MIT).
+    # Graceful skip when the server is down: health() never raises, and a
+    # refused localhost connection fails fast (no 30s hang).
+    try:
+        from songgeneration_mcp.acestep import AcestepClient
+
+        _ace = AcestepClient()
+        try:
+            if await _ace.health():
+                _ace_result = await _ace.generate(prompt, duration)
+                if _ace_result.get("success"):
+                    await _ace.close()
+                    return (
+                        {
+                            "success": True,
+                            "file": _ace_result.get("file", ""),
+                            "duration": _ace_result.get("duration", duration),
+                            "prompt": prompt,
+                            "model": _ace_result.get("model", "acestep-v15-turbo"),
+                            "backend": "acestep",
+                        },
+                        errors,
+                    )
+                errors["acestep"] = str(_ace_result.get("error", "generation failed"))
+            else:
+                log.info("ACE-Step skipped: no API server on :8001 (uv run acestep-api).")
+        finally:
+            await _ace.close()
+    except Exception as e:
+        errors["acestep"] = str(e) or type(e).__name__
+        log.exception("ACE-Step generation failed; falling back to next backend.")
+
+    # Backend 3: MusicGen (local HuggingFace model, first call downloads ~2GB)
     try:
         payload = await asyncio.to_thread(_run_musicgen_sync, prompt, duration)
         return payload, errors
     except Exception as e:
         errors["musicgen"] = str(e) or type(e).__name__
 
-    # Backend 3: Stable Audio Open (HuggingFace diffusers, local, first load ~3GB, gated model)
+    # Backend 4: Stable Audio Open (HuggingFace diffusers, local, first load ~3GB, gated model)
     hf_token = load_settings().get("hf_token") or os.environ.get("HF_TOKEN") or None
     try:
         payload = await asyncio.to_thread(_run_stableaudio_sync, prompt, duration, hf_token)
@@ -519,8 +553,8 @@ async def api_generate_post(request: Request) -> JSONResponse:
 async def api_v1_generate_post(request: Request) -> JSONResponse:
     """Quick Generate: ``{prompt, duration, lyrics?, model?}``.
 
-    Same local-backend chain as ``/api/generate`` (Lyria -> MusicGen ->
-    Stable Audio), then Studio SG2 as a last resort. Always returns JSON shaped
+    Same local-backend chain as ``/api/generate`` (Lyria -> ACE-Step ->
+    MusicGen -> Stable Audio), then Studio SG2 as a last resort. Always returns JSON shaped
     for the Quick page: ``{success, file, backend, model, ...}``.
     """
     try:
@@ -598,21 +632,17 @@ async def api_llm_providers(_request: Request) -> JSONResponse:
             r = await client.get(f"{ollama_base}/api/tags")
             if r.status_code == 200:
                 data = r.json()
-                ollama_models = [
-                    {"name": str(m.get("name", ""))} for m in data.get("models", []) if m.get("name")
-                ]
+                ollama_models = [{"name": str(m.get("name", ""))} for m in data.get("models", []) if m.get("name")]
     except Exception:
-        pass
+        logging.getLogger(__name__).debug("Ollama probe failed; empty list is honest", exc_info=True)
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             r = await client.get(f"{lmstudio_base}/v1/models")
             if r.status_code == 200:
                 data = r.json()
-                lmstudio_models = [
-                    {"name": str(m.get("id", ""))} for m in data.get("data", []) if m.get("id")
-                ]
+                lmstudio_models = [{"name": str(m.get("id", ""))} for m in data.get("data", []) if m.get("id")]
     except Exception:
-        pass
+        logging.getLogger(__name__).debug("LM Studio probe failed; empty list is honest", exc_info=True)
     return JSONResponse({"ollama": ollama_models, "lm_studio": lmstudio_models})
 
 
@@ -996,9 +1026,181 @@ async def api_media_get(request: Request) -> FileResponse | JSONResponse:
     return FileResponse(target)
 
 
+async def api_status_get(_request: Request) -> JSONResponse:
+    """Richer status than /api/health: backend configuration state (no secrets, no network)."""
+    settings = load_settings()
+    return JSONResponse(
+        {
+            "ok": True,
+            "service": "songgeneration-mcp",
+            "version": "0.1.0",
+            "mcp_path": "/mcp",
+            "repo_entries": len(list_entries(limit=10000)),
+            "backends": {
+                "lyria_configured": bool(
+                    settings.get("google_cloud_project") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+                ),
+                "acestep_url": os.environ.get("SONGGEN_ACESTEP_URL", "http://localhost:8001"),
+                "hf_token_configured": bool(settings.get("hf_token") or os.environ.get("HF_TOKEN")),
+                "studio_url": _logic.base_url,
+            },
+        }
+    )
+
+
+async def api_capabilities(_request: Request) -> JSONResponse:
+    """Standard-shape capability advertisement for fleet dashboards."""
+    return JSONResponse(
+        {
+            "service": "songgeneration-mcp",
+            "version": "0.1.0",
+            "rest": [
+                "GET /api/health",
+                "GET /api/status",
+                "GET /api/capabilities",
+                "GET /api/logs",
+                "POST /api/logs/clear",
+                "GET /api/studio/status",
+                "GET /api/studio/test",
+                "GET /api/studio/info",
+                "GET /api/lyria/status",
+                "GET /api/huggingface/status",
+                "POST /api/generate",
+                "POST /api/v1/generate",
+                "GET /api/v1/diagnostics",
+                "GET /api/songs",
+                "GET /api/songs/{repo_id}",
+                "GET/POST /api/settings",
+                "GET /api/llm/providers",
+                "GET /api/llm/models",
+                "GET /api/llm/discover",
+                "GET /api/llm/onboarding",
+                "POST /api/export/plex",
+                "POST /api/export/virtualdj",
+                "GET /api/export/virtualdj/status",
+                "POST /api/export/reaper",
+                "GET /api/media/{file_path:path}",
+                "POST /api/shutdown",
+            ],
+            "mcp_tools": [
+                "generate_song",
+                "list_models",
+                "get_status",
+                "cancel_generation",
+                "unload_models",
+                "diagnostics",
+                "shutdown",
+                "help",
+            ],
+            "backends": ["lyria", "acestep", "musicgen", "stableaudio", "studio"],
+        }
+    )
+
+
+async def api_shutdown_post(_request: Request) -> JSONResponse:
+    """Graceful shutdown for NSSM/service operation: 200 now, exit after 500ms."""
+    logging.getLogger(__name__).warning("Shutdown requested via POST /api/shutdown.")
+    threading.Timer(0.5, lambda: os._exit(0)).start()
+    return JSONResponse({"shutting_down": True})
+
+
+async def api_v1_diagnostics_get(_request: Request) -> JSONResponse:
+    """Cheap REST diagnostics: installed deps and config state, no network calls."""
+    import importlib.util
+    import sys
+
+    settings = load_settings()
+    return JSONResponse(
+        {
+            "service": "songgeneration-mcp",
+            "python": sys.version.split()[0],
+            "torch_installed": importlib.util.find_spec("torch") is not None,
+            "transformers_installed": importlib.util.find_spec("transformers") is not None,
+            "diffusers_installed": importlib.util.find_spec("diffusers") is not None,
+            "lyria_configured": bool(settings.get("google_cloud_project") or os.environ.get("GOOGLE_CLOUD_PROJECT")),
+            "hf_token_configured": bool(settings.get("hf_token") or os.environ.get("HF_TOKEN")),
+            "studio_url": _logic.base_url,
+            "repo_entries": len(list_entries(limit=10000)),
+        }
+    )
+
+
+async def _collect_llm_models() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Shared Ollama + LM Studio probe (short timeouts, never raises)."""
+    ollama_base = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+    lmstudio_base = os.getenv("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234").rstrip("/")
+    ollama_models: list[dict[str, str]] = []
+    lmstudio_models: list[dict[str, str]] = []
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{ollama_base}/api/tags")
+            if r.status_code == 200:
+                data = r.json()
+                ollama_models = [
+                    {"name": str(m.get("name", "")), "provider": "ollama"}
+                    for m in data.get("models", [])
+                    if m.get("name")
+                ]
+    except Exception:
+        logging.getLogger(__name__).debug("Ollama probe failed; empty list is honest", exc_info=True)
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{lmstudio_base}/v1/models")
+            if r.status_code == 200:
+                data = r.json()
+                lmstudio_models = [
+                    {"name": str(m.get("id", "")), "provider": "lm_studio"} for m in data.get("data", []) if m.get("id")
+                ]
+    except Exception:
+        logging.getLogger(__name__).debug("LM Studio probe failed; empty list is honest", exc_info=True)
+    return ollama_models, lmstudio_models
+
+
+async def api_llm_models(_request: Request) -> JSONResponse:
+    """Merged model list across local providers (what Settings derives locally)."""
+    ollama_models, lmstudio_models = await _collect_llm_models()
+    return JSONResponse({"models": ollama_models + lmstudio_models})
+
+
+async def api_llm_discover(_request: Request) -> JSONResponse:
+    """Provider reachability for the Settings page (no model enumeration)."""
+    ollama_models, lmstudio_models = await _collect_llm_models()
+    return JSONResponse(
+        {
+            "ollama_base": os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/"),
+            "lm_studio_base": os.getenv("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234").rstrip("/"),
+            "ollama_reachable": True if ollama_models else False,
+            "lm_studio_reachable": True if lmstudio_models else False,
+            "ollama_count": len(ollama_models),
+            "lm_studio_count": len(lmstudio_models),
+        }
+    )
+
+
+async def api_llm_onboarding(_request: Request) -> JSONResponse:
+    """Onboarding state: is there any local LLM to talk to, and what to do if not."""
+    ollama_models, lmstudio_models = await _collect_llm_models()
+    total = len(ollama_models) + len(lmstudio_models)
+    return JSONResponse(
+        {
+            "ready": total > 0,
+            "model_count": total,
+            "hint": (
+                "No local models found. Start Ollama (ollama serve) or LM Studio server, "
+                "or set OLLAMA_BASE_URL / LMSTUDIO_BASE_URL."
+                if total == 0
+                else f"{total} local model(s) available."
+            ),
+        }
+    )
+
+
 app = Starlette(
     routes=[
         Route("/api/health", api_health, methods=["GET"]),
+        Route("/api/status", api_status_get, methods=["GET"]),
+        Route("/api/capabilities", api_capabilities, methods=["GET"]),
+        Route("/api/shutdown", api_shutdown_post, methods=["POST"]),
         Route("/api/logs", api_logs_get, methods=["GET"]),
         Route("/api/logs/clear", api_logs_clear, methods=["POST"]),
         Route("/api/studio/status", api_studio_status, methods=["GET"]),
@@ -1008,11 +1210,15 @@ app = Starlette(
         Route("/api/huggingface/status", api_huggingface_status, methods=["GET"]),
         Route("/api/generate", api_generate_post, methods=["POST"]),
         Route("/api/v1/generate", api_v1_generate_post, methods=["POST"]),
+        Route("/api/v1/diagnostics", api_v1_diagnostics_get, methods=["GET"]),
         Route("/api/songs", api_songs_list, methods=["GET"]),
         Route("/api/songs/{repo_id}", api_song_get, methods=["GET"]),
         Route("/api/settings", api_settings_get, methods=["GET"]),
         Route("/api/settings", api_settings_post, methods=["POST"]),
         Route("/api/llm/providers", api_llm_providers, methods=["GET"]),
+        Route("/api/llm/models", api_llm_models, methods=["GET"]),
+        Route("/api/llm/discover", api_llm_discover, methods=["GET"]),
+        Route("/api/llm/onboarding", api_llm_onboarding, methods=["GET"]),
         Route("/api/export/plex", api_export_plex_post, methods=["POST"]),
         Route("/api/export/virtualdj", api_export_virtualdj_post, methods=["POST"]),
         Route("/api/export/virtualdj/status", api_export_virtualdj_status, methods=["GET"]),

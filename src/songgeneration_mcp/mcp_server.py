@@ -393,5 +393,26 @@ async def diagnostics() -> str:
 """
 
 
-if __name__ == "__main__":
+@app.tool()
+async def shutdown() -> str:
+    """Shut down the MCP server process (NSSM/service operation).
+
+    Returns:
+        Confirmation message; the process exits ~300ms after responding.
+    """
+    import os
+    import threading
+
+    logger.warning("Shutdown requested via shutdown tool.")
+    threading.Timer(0.3, lambda: os._exit(0)).start()
+    return "### 🛑 Shutting down\nsonggeneration-mcp exits in ~300ms."
+
+
+def main() -> None:
+    """Entry point for the `songgen` console script (pyproject.toml [project.scripts])
+    and `python -m songgeneration_mcp.mcp_server` / MCPB stdio launch."""
     run_server(app, server_name="songgeneration-mcp")
+
+
+if __name__ == "__main__":
+    main()
