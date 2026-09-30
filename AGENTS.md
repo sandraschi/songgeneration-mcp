@@ -20,13 +20,18 @@ just install-all           # Install all music backends
 | Webapp frontend | 10884 |
 
 ## Architecture
-FastMCP 3.4+ server with Starlette REST API. 4 music generation backends tried in order:
-Lyria (Vertex AI) → Stable Audio Open (diffusers) → MusicGen (transformers) → Studio SG2 (local API).
+FastMCP 3.4+ server with Starlette REST API. 5 music generation backends tried in order:
+Lyria (Vertex AI) → ACE-Step 1.5 (:8001) → MusicGen (transformers) → Stable Audio Open (diffusers) → Studio SG2 (:10930).
 
 ## Tools
-- `song_generate` — generate music from prompt
-- `song_list` — list generated tracks
-- `song_export` — export to Plex/Reaper/VirtualDJ
+- `generate_song` — generate a song from lyrics + style
+- `list_models` — list models available in Studio
+- `get_status` — GPU VRAM and queue state
+- `cancel_generation` — stop an active task
+- `unload_models` — free VRAM
+- `diagnostics` — server diagnostic report
+- `shutdown` — shut down the server process
+- `help` — server help (levels + lyria topic)
 
 ## Key Files
 | File | Purpose |
