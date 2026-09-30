@@ -12,8 +12,13 @@
   "tags": ["music", "generation", "ai", "audio", "lyria", "stable-audio", "musicgen"],
   "requirements": ["Python 3.12+", "CUDA GPU recommended for local models"],
   "tools": [
-    {"name": "song_generate", "description": "Generate music from text prompt using available backends"},
-    {"name": "song_list", "description": "List previously generated tracks"},
-    {"name": "song_export", "description": "Export generated track to Plex, Reaper, or VirtualDJ"}
+    {"name": "generate_song", "description": "Generate a song from lyrics + style via Lyria, ACE-Step, MusicGen, Stable Audio or Studio SG2"},
+    {"name": "list_models", "description": "List models available in Studio"},
+    {"name": "get_status", "description": "GPU VRAM and generation queue state"},
+    {"name": "cancel_generation", "description": "Stop an active generation task"},
+    {"name": "unload_models", "description": "Free GPU VRAM"},
+    {"name": "diagnostics", "description": "Server diagnostic report"},
+    {"name": "shutdown", "description": "Shut down the server process"},
+    {"name": "help", "description": "Server help (levels + lyria topic)"}
   ]
 }

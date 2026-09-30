@@ -21,6 +21,7 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov>=5.0.0",
     "respx>=0.21.0",
     "ruff>=0.16.0,<0.17",
 ]
@@ -51,13 +52,17 @@ asyncio_mode = "auto"
 source = ["src"]
 omit = ["tests/*", "*/__pycache__/*"]
 
+[tool.coverage.report]
+fail_under = 50
+show_missing = true
+
 [tool.ruff]
 line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "S", "UP", "RUF"]
-ignore = ["S101", "B008", "S106", "S110", "S112", "S101", "B008", "S106", "S110", "S112", "RUF012", "S603", "S607", "S324", "E402", "E501"]
+ignore = ["S101", "B008", "S106", "RUF012", "S603", "S607", "S324", "E402", "E501"]
 
 [tool.ruff.format]
 quote-style = "double"
