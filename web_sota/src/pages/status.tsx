@@ -25,7 +25,7 @@ export function Status() {
   }, [load]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="status">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
