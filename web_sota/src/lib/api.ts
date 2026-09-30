@@ -381,3 +381,18 @@ export async function fetchStudioTest(): Promise<{
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
+
+export interface RepoSkill {
+  name: string;
+  path: string;
+  chars: number;
+}
+
+export async function fetchSkills(): Promise<{
+  skills: RepoSkill[];
+  preprompt_chars: number;
+}> {
+  const r = await fetch(_url("/api/skills"));
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}

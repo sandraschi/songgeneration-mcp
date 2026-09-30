@@ -1,5 +1,6 @@
 import {
   Activity,
+  BookOpen,
   Bot,
   Brain,
   ChevronLeft,
@@ -7,6 +8,7 @@ import {
   Grid,
   Headphones,
   HelpCircle,
+  Inbox,
   LayoutDashboard,
   Music2,
   ScrollText,
@@ -36,6 +38,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/apps", label: "App Hub", icon: Grid },
     { href: "/local-llm", label: "Local LLM", icon: Brain },
     { href: "/chat", label: "Chat", icon: Bot },
+    { href: "/inbox", label: "Inbox", icon: Inbox },
+    { href: "/skills", label: "Skills", icon: BookOpen },
     { href: "/logger", label: "Logger", icon: ScrollText },
     { href: "/help", label: "Help", icon: HelpCircle },
     { href: "/settings", label: "Settings", icon: Settings },
