@@ -1075,6 +1075,8 @@ async def api_capabilities(_request: Request) -> JSONResponse:
                 "GET /api/llm/models",
                 "GET /api/llm/discover",
                 "GET /api/llm/onboarding",
+                "GET /api/skills",
+                "POST /api/ai/chat",
                 "POST /api/export/plex",
                 "POST /api/export/virtualdj",
                 "GET /api/export/virtualdj/status",
@@ -1177,6 +1179,116 @@ async def api_llm_discover(_request: Request) -> JSONResponse:
     )
 
 
+def _skills_preprompt(max_chars: int = 2000) -> str:
+    """Skill-first: prepend repo skills to chat system prompts (cap total chars)."""
+    from pathlib import Path as _Path
+
+    parts: list[str] = []
+    total = 0
+    skills_dir = _Path(__file__).resolve().parent.parent.parent / "skills"
+    if skills_dir.is_dir():
+        for md in sorted(skills_dir.glob("*.md")):
+            try:
+                text = md.read_text(encoding="utf-8").strip()
+            except OSError:
+                continue
+            if not text or total >= max_chars:
+                break
+            take = text[: max_chars - total]
+            parts.append(f"[{md.stem}]\n{take}")
+            total += len(take)
+    return ("\n\n".join(parts)).strip()
+
+
+async def api_skills(_request: Request) -> JSONResponse:
+    """List repo skills for skill-first chat clients."""
+    from pathlib import Path as _Path
+
+    skills_dir = _Path(__file__).resolve().parent.parent.parent / "skills"
+    items: list[dict[str, object]] = []
+    if skills_dir.is_dir():
+        for md in sorted(skills_dir.glob("*.md")):
+            try:
+                items.append(
+                    {"name": md.stem, "path": f"skills/{md.name}", "chars": len(md.read_text(encoding="utf-8"))}
+                )
+            except OSError:
+                continue
+    return JSONResponse({"skills": items, "preprompt_chars": len(_skills_preprompt())})
+
+
+async def api_ai_chat_post(request: Request) -> JSONResponse:
+    """Chat endpoint the webapp posts to: {message, system_prompt?, context?}.
+
+    Forwards to local Ollama (/api/chat) then LM Studio (/v1/chat/completions),
+    skill-first (repo skills prepended), history capped at 100. No local LLM
+    yields an honest 503, never a faked reply.
+    """
+    try:
+        body = await request.json()
+    except Exception as e:
+        return JSONResponse({"error": f"invalid json: {e}"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "body must be an object"}, status_code=400)
+    message = str(body.get("message", "") or "").strip()
+    if not message:
+        return JSONResponse({"error": "message is required"}, status_code=400)
+    system_prompt = str(body.get("system_prompt", "") or "")
+    history = ((body.get("context") or {}) if isinstance(body.get("context"), dict) else {}).get("history", [])
+    if not isinstance(history, list):
+        history = []
+    history = history[-100:]
+
+    skills = _skills_preprompt()
+    system_full = "\n\n".join(p for p in (system_prompt.strip(), skills) if p)
+    messages: list[dict[str, str]] = []
+    if system_full:
+        messages.append({"role": "system", "content": system_full})
+    for m in history:
+        if isinstance(m, dict) and m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
+            messages.append({"role": str(m["role"]), "content": str(m["content"])[:4000]})
+    messages.append({"role": "user", "content": message})
+    messages = [m for m in messages if m["role"] != "system"][-101:]
+    if system_full:
+        messages = [{"role": "system", "content": system_full}, *messages]
+
+    ollama_models, lmstudio_models = await _collect_llm_models()
+    try:
+        if ollama_models:
+            ollama_base = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+            model = ollama_models[0]["name"]
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                r = await client.post(
+                    f"{ollama_base}/api/chat",
+                    json={"model": model, "messages": messages, "stream": False},
+                )
+                if r.status_code == 200:
+                    reply = ((r.json().get("message") or {}).get("content") or "").strip()
+                    if reply:
+                        return JSONResponse({"reply": reply, "model": model, "provider": "ollama"})
+        if lmstudio_models:
+            lm_base = os.getenv("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234").rstrip("/")
+            model = lmstudio_models[0]["name"]
+            lm_messages = [m for m in messages if m["role"] in ("system", "user", "assistant")]
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                r = await client.post(
+                    f"{lm_base}/v1/chat/completions",
+                    json={"model": model, "messages": lm_messages, "stream": False},
+                )
+                if r.status_code == 200:
+                    choices = r.json().get("choices", [])
+                    reply = (((choices[0] or {}).get("message") or {}).get("content") or "").strip() if choices else ""
+                    if reply:
+                        return JSONResponse({"reply": reply, "model": model, "provider": "lm_studio"})
+    except Exception as e:
+        logging.getLogger(__name__).exception("AI chat forward failed")
+        return JSONResponse({"error": f"LLM forward failed: {e}"}, status_code=502)
+    return JSONResponse(
+        {"error": "No local LLM available. Start Ollama (ollama serve) or LM Studio server."},
+        status_code=503,
+    )
+
+
 async def api_llm_onboarding(_request: Request) -> JSONResponse:
     """Onboarding state: is there any local LLM to talk to, and what to do if not."""
     ollama_models, lmstudio_models = await _collect_llm_models()
@@ -1219,6 +1331,8 @@ app = Starlette(
         Route("/api/llm/models", api_llm_models, methods=["GET"]),
         Route("/api/llm/discover", api_llm_discover, methods=["GET"]),
         Route("/api/llm/onboarding", api_llm_onboarding, methods=["GET"]),
+        Route("/api/skills", api_skills, methods=["GET"]),
+        Route("/api/ai/chat", api_ai_chat_post, methods=["POST"]),
         Route("/api/export/plex", api_export_plex_post, methods=["POST"]),
         Route("/api/export/virtualdj", api_export_virtualdj_post, methods=["POST"]),
         Route("/api/export/virtualdj/status", api_export_virtualdj_status, methods=["GET"]),

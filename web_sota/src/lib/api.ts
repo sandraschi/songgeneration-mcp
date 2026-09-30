@@ -1,6 +1,7 @@
 // Fleet pattern: Vite dev proxy handles /api -> 10885, so relative URL is preferred.
 // VITE_API_BASE can override for Tauri/production (e.g. http://127.0.0.1:10885).
-const _envBase = (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? "";
+const _envBase =
+  (import.meta.env.VITE_API_BASE as string | undefined)?.trim() ?? "";
 export const API_BASE = _envBase.replace(/\/$/, "") || "";
 const _url = (path: string) => `${API_BASE}${path}`;
 /** Relative URLs -- Vite dev server proxies `/api` and `/mcp` to uvicorn (see vite.config.ts). */
@@ -23,8 +24,12 @@ export type ApiLogLine = {
   message: string;
 };
 
-export async function fetchLogs(limit = 300): Promise<{ lines: ApiLogLine[]; count: number }> {
-  const r = await fetch(_url(`/api/logs?limit=${encodeURIComponent(String(limit))}`));
+export async function fetchLogs(
+  limit = 300,
+): Promise<{ lines: ApiLogLine[]; count: number }> {
+  const r = await fetch(
+    _url(`/api/logs?limit=${encodeURIComponent(String(limit))}`),
+  );
   if (!r.ok) throw new Error(`logs ${r.status}`);
   return r.json();
 }
@@ -79,13 +84,19 @@ export type GenerateResponse = {
   source_audio_urls?: string[];
   mp3_urls?: string[];
   stem_urls?: { vocal?: string[]; instrumental?: string[]; mix?: string[] };
-  source_stem_urls?: { vocal?: string[]; instrumental?: string[]; mix?: string[] };
+  source_stem_urls?: {
+    vocal?: string[];
+    instrumental?: string[];
+    mix?: string[];
+  };
   mp3_stem_urls?: { vocal?: string[]; instrumental?: string[]; mix?: string[] };
   studio_response?: Record<string, unknown>;
   punctuation_notes?: string[];
 };
 
-export async function postGenerate(body: GenerateBody): Promise<GenerateResponse> {
+export async function postGenerate(
+  body: GenerateBody,
+): Promise<GenerateResponse> {
   const r = await fetch(_url("/api/generate"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -108,7 +119,11 @@ export type SongEntry = {
   source_audio_urls?: string[];
   mp3_urls?: string[];
   stem_urls?: { vocal?: string[]; instrumental?: string[]; mix?: string[] };
-  source_stem_urls?: { vocal?: string[]; instrumental?: string[]; mix?: string[] };
+  source_stem_urls?: {
+    vocal?: string[];
+    instrumental?: string[];
+    mix?: string[];
+  };
   mp3_stem_urls?: { vocal?: string[]; instrumental?: string[]; mix?: string[] };
   punctuation_notes?: string[];
 };
@@ -221,7 +236,10 @@ export type PlexExportResponse = {
   errors?: string[];
 };
 
-export async function postExportPlex(body: { repo_id?: string; export_all?: boolean }): Promise<PlexExportResponse> {
+export async function postExportPlex(body: {
+  repo_id?: string;
+  export_all?: boolean;
+}): Promise<PlexExportResponse> {
   const r = await fetch(_url("/api/export/plex"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -297,18 +315,27 @@ export type QuickGenerateResponse = {
   backend_errors?: Record<string, string>;
 };
 
-export async function postQuickGenerate(prompt: string, duration: number): Promise<QuickGenerateResponse> {
+export async function postQuickGenerate(
+  prompt: string,
+  duration: number,
+): Promise<QuickGenerateResponse> {
   let r: Response;
   try {
     r = await fetch(_url("/api/v1/generate"), {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({prompt, duration}),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, duration }),
     });
   } catch (e) {
     return {
-      success: false, file: "", backend: "none", model: "",
-      error: e instanceof Error ? `backend unreachable: ${e.message}` : "backend unreachable",
+      success: false,
+      file: "",
+      backend: "none",
+      model: "",
+      error:
+        e instanceof Error
+          ? `backend unreachable: ${e.message}`
+          : "backend unreachable",
     };
   }
   const text = await r.text();
@@ -317,15 +344,40 @@ export async function postQuickGenerate(prompt: string, duration: number): Promi
     data = JSON.parse(text) as QuickGenerateResponse;
   } catch {
     return {
-      success: false, file: "", backend: "none", model: "",
+      success: false,
+      file: "",
+      backend: "none",
+      model: "",
       error: `backend HTTP ${r.status}: ${(text || r.statusText).slice(0, 200)}`,
     };
   }
   return data;
 }
 
-export async function fetchBackends(): Promise<{available: string[]; active: string}> {
+export async function fetchBackends(): Promise<{
+  available: string[];
+  active: string;
+}> {
   const r = await fetch(_url("/api/health"));
-  if (!r.ok) return {available: [], active: "none"};
+  if (!r.ok) return { available: [], active: "none" };
+  return r.json();
+}
+
+export async function fetchOnboarding(): Promise<{
+  ready: boolean;
+  model_count: number;
+  hint: string;
+}> {
+  const r = await fetch(_url("/api/llm/onboarding"));
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function fetchStudioTest(): Promise<{
+  ok: boolean;
+  checks: { name: string; ok: boolean; detail: string }[];
+}> {
+  const r = await fetch(_url("/api/studio/test"));
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }

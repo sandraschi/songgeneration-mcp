@@ -4,8 +4,10 @@ Tencent SongGeneration v2 (LeVo 2 / SG2): lyrics, style, dual-track output, opti
 """
 
 import logging
+from typing import Annotated
 
 from fastmcp import FastMCP
+from pydantic import Field
 
 from .logic import SongGenerationLogic
 from .lyria_compare import get_lyria_vs_sg2_text
@@ -118,16 +120,22 @@ Focus on:
 """
 
 
-@app.tool()
-async def help(level: str = "basic", topic: str | None = None) -> str:
+@app.tool(
+    annotations={"readOnlyHint": True, "idempotentHint": True},
+)
+async def help(
+    level: Annotated[str, Field(description='Detail level - "basic", "intermediate", or "advanced"')] = "basic",
+    topic: Annotated[
+        str | None, Field(description='Optional focus; use topic="lyria" for SG2 vs Gemini Lyria 3 Pro')
+    ] = None,
+) -> str:
     """Get help information about this MCP server.
 
-    Args:
-        level: Detail level - "basic", "intermediate", or "advanced"
-        topic: Optional focus; use topic="lyria" for SG2 vs Gemini Lyria 3 Pro (any level)
+    ## Return Format
+    Markdown help text for the requested level (or the Lyria comparison for topic="lyria").
 
-    Returns:
-        Help text for the server
+    ## Examples
+    help() | help(level="advanced") | help(topic="lyria")
     """
     if topic and "lyria" in topic.lower():
         return get_lyria_vs_sg2_text()
@@ -145,6 +153,7 @@ Tencent SongGeneration v2 (LeVo 2 / SG2) via SongGeneration-Studio - local open-
 - `cancel_generation` - stop an active task
 - `unload_models` - free VRAM
 - `diagnostics` - server diagnostic report
+- `shutdown` - shut down the server process
 - `help` - this help (level="basic"|"intermediate"|"advanced", topic="lyria")
 
 ## Key facts
@@ -224,13 +233,15 @@ output, so stems are phase-coherent with the mix.
 | VRAM | ~22 GB (v2-large bfloat16) | None (cloud) |
 
 ## API endpoints (Starlette ASGI, port 10885)
-- GET  /api/health
+- GET  /api/health · /api/status · /api/capabilities · POST /api/shutdown
 - GET  /api/studio/status - Studio reachability + generation queue
 - GET  /api/studio/test  - deep check: dir, HTTP, GPU, model-server, models
 - GET  /api/studio/info
-- POST /api/generate
+- POST /api/generate · POST /api/v1/generate · GET /api/v1/diagnostics
 - GET  /api/songs  ·  GET /api/songs/{repo_id}
 - GET/POST /api/settings
+- GET  /api/llm/providers|models|discover|onboarding
+- GET  /api/skills · POST /api/ai/chat
 - POST /api/export/plex  ·  /api/export/virtualdj  ·  /api/export/reaper
 - GET  /api/export/virtualdj/status
 - GET  /api/media/{file_path:path}
@@ -240,62 +251,65 @@ Full doc: resource `docs://lyria-vs-sg2`, file `docs/LYRIA_VS_SG2.md`
 """
 
 
-@app.tool()
+@app.tool(
+    annotations={"readOnlyHint": True, "idempotentHint": True},
+)
 async def list_models() -> list[str]:
     """List all available high-quality song generation models from the backend.
 
     Retrieves the list of model identifiers currently supported by the
     SongGeneration-Studio model server.
 
-    Returns:
-        List of model ID strings (e.g. tencent/SongGeneration::v2-large when exposed by Studio).
+    ## Return Format
+    List of model ID strings (e.g. tencent/SongGeneration::v2-large when exposed by Studio).
+
+    ## Examples
+    list_models()
     """
     return await logic.list_models()
 
 
-@app.tool()
+@app.tool(
+    annotations={"readOnlyHint": False, "idempotentHint": False, "openWorldHint": True},
+)
 async def generate_song(
-    lyrics: str,
-    genre: str = "Pop",
-    mood: str = "Happy",
-    tempo: int = 120,
-    voice: str = "Female",
-    structure: list[str] | None = None,
-    separate_stems: bool = True,
-    title: str | None = None,
-    model_repo: str | None = None,
-    model_weights: str | None = None,
-    max_length_seconds: int = 270,
-    torch_dtype: str = "bfloat16",
-    style_audio_prompt_path: str | None = None,
-    mix_dual_tracks: bool = False,
-    auto_fix_english_punctuation: bool = True,
+    lyrics: Annotated[
+        str,
+        Field(description="Full lyrics. SG2 length tags ([intro-short], [chorus], etc.), ';' between sections."),
+    ],
+    genre: Annotated[str, Field(description="Musical genre (e.g. Rock, Pop)")] = "Pop",
+    mood: Annotated[str, Field(description="Emotional vibe")] = "Happy",
+    tempo: Annotated[int, Field(description="BPM (about 60-180)", ge=40, le=220)] = 120,
+    voice: Annotated[str, Field(description='"Male" or "Female"')] = "Female",
+    structure: Annotated[list[str] | None, Field(description="Section order hint for the client")] = None,
+    separate_stems: Annotated[bool, Field(description="Request dual-track output (vocal.wav + inst.wav)")] = True,
+    title: Annotated[str | None, Field(description="Optional song title")] = None,
+    model_repo: Annotated[
+        str | None, Field(description="Hugging Face repo id (default tencent/SongGeneration)")
+    ] = None,
+    model_weights: Annotated[str | None, Field(description="Weight variant (default v2-large)")] = None,
+    max_length_seconds: Annotated[int, Field(description="Max generation length (default 270 ≈ 4.5 min)")] = 270,
+    torch_dtype: Annotated[str, Field(description="e.g. bfloat16 for ~22GB VRAM on Large")] = "bfloat16",
+    style_audio_prompt_path: Annotated[
+        str | None, Field(description="Path on the Studio machine to a ~10s WAV for style cloning")
+    ] = None,
+    mix_dual_tracks: Annotated[
+        bool, Field(description="Prefer a single mixed master when the backend supports it")
+    ] = False,
+    auto_fix_english_punctuation: Annotated[
+        bool, Field(description="Insert missing '.' before ';' for English segments")
+    ] = True,
 ) -> str:
     """GENERATE_SONG - Start LeVo 2 (SongGeneration v2) generation via SongGeneration-Studio.
 
     PORTMANTEAU PATTERN RATIONALE: One MCP entry point for lyrics, SG2 inference flags,
     dual-track output, and optional Style RAG (10s audio prompt), matching fleet docstring style.
 
-    Args:
-        lyrics: Full lyrics. Use SG2 length tags ([intro-short], [chorus], etc.) and ';' between
-            sections. For English, each line should end with '.' before ';' (optional auto-fix).
-        genre: Musical genre (e.g. Rock, Pop).
-        mood: Emotional vibe.
-        tempo: BPM (about 60-180).
-        voice: "Male" or "Female".
-        structure: Section order hint for the client (passed through for future Studio use).
-        separate_stems: If True (default), request dual-track output (vocal.wav + inst.wav).
-        title: Optional song title.
-        model_repo: Hugging Face repo id (default tencent/SongGeneration or env SONGGEN_MODEL_REPO).
-        model_weights: Weight variant (default v2-large or env SONGGEN_MODEL_WEIGHTS).
-        max_length_seconds: Max generation length (default 270 ≈ 4.5 min).
-        torch_dtype: e.g. bfloat16 for ~22GB VRAM on Large.
-        style_audio_prompt_path: Path on the Studio machine to a ~10s WAV for style cloning.
-        mix_dual_tracks: If True, prefer a single mixed master when the backend supports it.
-        auto_fix_english_punctuation: Insert missing '.' before ';' for English segments.
+    ## Return Format
+    Status string with task id and SG2 notes.
 
-    Returns:
-        Status string with task id and SG2 notes.
+    ## Examples
+    generate_song(lyrics="[verse] Neon rain. ; [chorus] Rise and fall. ;", genre="Synthwave")
     """
     request = {
         "lyrics": lyrics,
@@ -317,15 +331,20 @@ async def generate_song(
     return await logic.generate_song(request)
 
 
-@app.tool()
+@app.tool(
+    annotations={"readOnlyHint": True, "idempotentHint": True},
+)
 async def get_status() -> str:
     """Get detailed GPU VRAM metrics and current generation service state.
 
     Provides critical telemetry for resource management including memory
     usage and task saturation.
 
-    Returns:
-        Formatted Markdown report of the system status.
+    ## Return Format
+    Formatted Markdown report of the system status.
+
+    ## Examples
+    get_status()
     """
     status_data = await logic.get_status()
     vram_percent = (status_data["vram_used"] / status_data["vram_total"] * 100) if status_data["vram_total"] > 0 else 0
@@ -346,15 +365,19 @@ async def get_status() -> str:
 """
 
 
-@app.tool()
-async def cancel_generation(task_id: str) -> str:
+@app.tool(
+    annotations={"destructiveHint": True, "idempotentHint": True},
+)
+async def cancel_generation(
+    task_id: Annotated[str, Field(description="The unique identifier of the task to cancel")],
+) -> str:
     """Immediately stop an active or pending song generation task.
 
-    Args:
-        task_id: The unique identifier for the task to be cancelled.
+    ## Return Format
+    Confirmation message, or an error if the task could not be stopped.
 
-    Returns:
-        Confirmation message or error if the task could not be stopped.
+    ## Examples
+    cancel_generation(task_id="abc123")
     """
     success = await logic.cancel_generation(task_id)
     if success:
@@ -362,15 +385,20 @@ async def cancel_generation(task_id: str) -> str:
     return f"### ❌ Cancellation Failed\nTask `{task_id}` was not found or has already finished."
 
 
-@app.tool()
+@app.tool(
+    annotations={"destructiveHint": True, "idempotentHint": True},
+)
 async def unload_models() -> str:
     """Unload all active AI models from GPU VRAM to free resources.
 
     Use this tool when no further generations are planned to release
     high-performance hardware resources for other applications.
 
-    Returns:
-        Status message confirming the resource release.
+    ## Return Format
+    Status message confirming the resource release.
+
+    ## Examples
+    unload_models()
     """
     success = await logic.unload_models()
     if success:
@@ -378,27 +406,37 @@ async def unload_models() -> str:
     return "> [!WARNING]\n> Failed to unload models. Backend may be busy or unreachable."
 
 
-@app.tool()
+@app.tool(
+    annotations={"readOnlyHint": True, "idempotentHint": True},
+)
 async def diagnostics() -> str:
     """Run comprehensive system diagnostics for the MCP server.
 
-    Returns:
-        Markdown diagnostic report.
+    ## Return Format
+    Markdown diagnostic report.
+
+    ## Examples
+    diagnostics()
     """
     return """# songgeneration-mcp Diagnostics
 - **Status:** Operational
-- **Architecture:** FastMCP 3.1+
-- **Backend:** SongGeneration-Studio REST (SG2 payload)
+- **Architecture:** FastMCP 3.4+
+- **Backend:** SongGeneration-Studio REST (SG2 payload) + Lyria/ACE-Step/MusicGen/StableAudio chain
 - **Docs:** `docs/PRD.md`, `docs/LYRIA_VS_SG2.md`; MCP resource `docs://lyria-vs-sg2`
 """
 
 
-@app.tool()
+@app.tool(
+    annotations={"destructiveHint": True, "idempotentHint": True},
+)
 async def shutdown() -> str:
     """Shut down the MCP server process (NSSM/service operation).
 
-    Returns:
-        Confirmation message; the process exits ~300ms after responding.
+    ## Return Format
+    Confirmation message; the process exits ~300ms after responding.
+
+    ## Examples
+    shutdown()
     """
     import os
     import threading

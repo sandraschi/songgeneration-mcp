@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Music, Wand2, Loader2, Check, Sparkles } from "lucide-react";
+import { Check, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { useCallback, useState } from "react";
 import { postQuickGenerate, type QuickGenerateResponse } from "../lib/api";
 
 const BACKENDS = [
@@ -32,22 +32,25 @@ export default function QuickGenerate() {
       } else {
         setError([data.error, data.hint].filter(Boolean).join(" "));
       }
-    } catch (e: any) {
-      setError(e.message || "Connection failed");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Connection failed");
     }
     setLoading(false);
   }, [prompt, duration]);
 
-  const loadToDeck = useCallback(async (deck: number) => {
-    if (!result?.file) return;
-    try {
-      await fetch(`http://127.0.0.1:11116/api/v1/deck/${deck}/load`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ track_path: result.file }),
-      });
-    } catch {}
-  }, [result]);
+  const loadToDeck = useCallback(
+    async (deck: number) => {
+      if (!result?.file) return;
+      try {
+        await fetch(`http://127.0.0.1:11116/api/v1/deck/${deck}/load`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ track_path: result.file }),
+        });
+      } catch {}
+    },
+    [result],
+  );
 
   return (
     <div className="space-y-6" data-testid="quick-generate">
@@ -57,13 +60,20 @@ export default function QuickGenerate() {
             <Sparkles size={20} className="text-purple-400" />
             Quick Generate
           </h2>
-          <p className="text-sm text-slate-500 mt-0.5">Text prompt → AI music, any backend</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Text prompt → AI music, any backend
+          </p>
         </div>
         <div className="flex gap-2">
           {BACKENDS.map((b) => (
-            <span key={b.id} className={`text-[10px] px-2 py-1 rounded-full ${
-              activeBackend === b.id ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" : "bg-slate-800 text-slate-500"
-            }`}>
+            <span
+              key={b.id}
+              className={`text-[10px] px-2 py-1 rounded-full ${
+                activeBackend === b.id
+                  ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                  : "bg-slate-800 text-slate-500"
+              }`}
+            >
               {b.icon} {b.name}
             </span>
           ))}
@@ -82,12 +92,17 @@ export default function QuickGenerate() {
             data-testid="prompt-input"
           />
           <button
+            type="button"
             onClick={generate}
             disabled={loading || !prompt.trim()}
             className="px-6 py-3 rounded-xl bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
             data-testid="generate-btn"
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+            {loading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Wand2 size={16} />
+            )}
             Generate
           </button>
         </div>
@@ -95,8 +110,14 @@ export default function QuickGenerate() {
         <div className="flex items-center gap-4 mt-4">
           <label className="flex items-center gap-2 text-xs text-slate-400">
             Duration:
-            <input type="range" min={5} max={60} value={duration} onChange={(e) => setDuration(Number(e.target.value))}
-              className="w-24 accent-purple-500" />
+            <input
+              type="range"
+              min={5}
+              max={60}
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
+              className="w-24 accent-purple-500"
+            />
             <span className="font-mono text-slate-300 w-8">{duration}s</span>
           </label>
         </div>
@@ -109,32 +130,50 @@ export default function QuickGenerate() {
       )}
 
       {result && (
-        <motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}}
-          className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-slate-800 bg-slate-900/50 p-4"
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Check size={16} className="text-emerald-400" />
               <div>
                 <p className="text-sm text-slate-200">Generated</p>
-                <p className="text-[10px] text-slate-500">via {result.backend} · {result.model}</p>
+                <p className="text-[10px] text-slate-500">
+                  via {result.backend} · {result.model}
+                </p>
                 {result.generation_id && (
-                  <p className="text-[10px] text-slate-500 font-mono">task {result.generation_id}</p>
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    task {result.generation_id}
+                  </p>
                 )}
                 {result.message && (
-                  <p className="text-xs text-slate-400 mt-1">{result.message}</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {result.message}
+                  </p>
                 )}
                 {result.file ? (
-                  <p className="text-[10px] text-slate-500 font-mono break-all">{result.file}</p>
+                  <p className="text-[10px] text-slate-500 font-mono break-all">
+                    {result.file}
+                  </p>
                 ) : (
-                  <p className="text-xs text-slate-500 mt-1">No audio file yet — Studio renders async. Pick it up on Generate / Listen.</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    No audio file yet — Studio renders async. Pick it up on
+                    Generate / Listen.
+                  </p>
                 )}
               </div>
             </div>
             {result.file && (
               <div className="flex gap-1">
                 {[1, 2, 3, 4].map((d) => (
-                  <button key={d} onClick={() => loadToDeck(d)}
-                    className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-mono transition-colors">
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => loadToDeck(d)}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-mono transition-colors"
+                  >
                     Load D{d}
                   </button>
                 ))}

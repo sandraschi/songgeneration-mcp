@@ -1,17 +1,22 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AppLayout } from '@/components/layout/app-layout';
-import { Dashboard } from '@/pages/dashboard';
-import { Chat } from '@/pages/chat';
-import { Settings } from '@/pages/settings';
-import { Tools } from '@/pages/tools';
-import { Status } from '@/pages/status';
-import { Apps } from '@/pages/apps';
-import { Help } from '@/pages/help';
-import { LocalLlm } from '@/pages/local-llm';
-import { Logger } from '@/pages/logger';
-import { Generate } from '@/pages/generate';
-import { Listen } from '@/pages/listen';
-import QuickGenerate from '@/pages/quick';
+import {
+  Navigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+} from "react-router-dom";
+import { AppLayout } from "@/components/layout/app-layout";
+import { Apps } from "@/pages/apps";
+import { Chat } from "@/pages/chat";
+import { Dashboard } from "@/pages/dashboard";
+import { Generate } from "@/pages/generate";
+import { Help } from "@/pages/help";
+import { Listen } from "@/pages/listen";
+import { LocalLlm } from "@/pages/local-llm";
+import { Logger } from "@/pages/logger";
+import QuickGenerate from "@/pages/quick";
+import { Settings } from "@/pages/settings";
+import { Status } from "@/pages/status";
+import { Tools } from "@/pages/tools";
 
 function App() {
   return (

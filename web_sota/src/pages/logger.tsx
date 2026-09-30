@@ -1,10 +1,10 @@
+import { Download, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Download, RefreshCw } from "lucide-react";
-import { clearLogs, fetchLogs, type ApiLogLine } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { type ApiLogLine, clearLogs, fetchLogs } from "@/lib/api";
 
 export type LogLevel = "info" | "warn" | "error";
 
@@ -42,6 +42,7 @@ export function Logger() {
     return () => window.clearInterval(id);
   }, [load]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll intentionally keyed on lines although the value is not read
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
@@ -61,7 +62,9 @@ export function Logger() {
   };
 
   const download = () => {
-    const t = lines.map((l) => `${l.ts} [${l.level}] ${l.logger} ${l.message}`).join("\n");
+    const t = lines
+      .map((l) => `${l.ts} [${l.level}] ${l.logger} ${l.message}`)
+      .join("\n");
     const blob = new Blob([t], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -81,11 +84,15 @@ export function Logger() {
     <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">Logger</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-white">
+            Logger
+          </h2>
           <p className="text-slate-400">
-            Python <code className="text-slate-500">logging</code> ring buffer from the MCP HTTP process (
+            Python <code className="text-slate-500">logging</code> ring buffer
+            from the MCP HTTP process (
             <code className="text-slate-500">GET /api/logs</code>
-            ). Start backend with <code className="text-slate-500">web_sota/start.ps1</code>.
+            ). Start backend with{" "}
+            <code className="text-slate-500">web_sota/start.ps1</code>.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -99,15 +106,34 @@ export function Logger() {
             <option value="warn">warn</option>
             <option value="error">error</option>
           </select>
-          <Button variant="outline" size="sm" className="border-slate-700" onClick={() => void load()} disabled={loading}>
-            <RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-slate-700"
+            onClick={() => void load()}
+            disabled={loading}
+          >
+            <RefreshCw
+              className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" className="border-slate-700" onClick={download} disabled={!lines.length}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-slate-700"
+            onClick={download}
+            disabled={!lines.length}
+          >
             <Download className="mr-1 h-4 w-4" />
             Export
           </Button>
-          <Button variant="outline" size="sm" className="border-slate-700 text-red-300" onClick={() => void onClear()}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-slate-700 text-red-300"
+            onClick={() => void onClear()}
+          >
             <Trash2 className="mr-1 h-4 w-4" />
             Clear buffer
           </Button>
@@ -115,13 +141,18 @@ export function Logger() {
       </div>
 
       {error ? (
-        <p className="rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">{error}</p>
+        <p className="rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
+          {error}
+        </p>
       ) : null}
 
       <Card className="flex min-h-0 flex-1 flex-col border-slate-800 bg-slate-950/50">
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <CardTitle className="text-base text-white">Process log</CardTitle>
-          <Badge variant="outline" className="border-slate-600 font-mono text-slate-500">
+          <Badge
+            variant="outline"
+            className="border-slate-600 font-mono text-slate-500"
+          >
             {filtered.length} lines
           </Badge>
         </CardHeader>
@@ -131,13 +162,16 @@ export function Logger() {
               {loading && !lines.length ? (
                 <p className="text-slate-500">Loading…</p>
               ) : !filtered.length ? (
-                <p className="text-slate-500">No log lines yet (or buffer empty).</p>
+                <p className="text-slate-500">
+                  No log lines yet (or buffer empty).
+                </p>
               ) : (
-                filtered.map((l, i) => (
-                  <p key={`${l.ts}-${i}`} className={levelStyle(l.level)}>
+                filtered.map((l) => (
+                  <p key={`${l.ts}-${l.message.slice(0, 32)}`} className={levelStyle(l.level)}>
                     <span className="text-slate-500">{l.ts}</span>{" "}
                     <span className="text-slate-600">[{l.level}]</span>{" "}
-                    <span className="text-slate-500">{l.logger}</span> {l.message}
+                    <span className="text-slate-500">{l.logger}</span>{" "}
+                    {l.message}
                   </p>
                 ))
               )}
