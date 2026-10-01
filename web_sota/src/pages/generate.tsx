@@ -59,6 +59,7 @@ export function Generate() {
   const [submitErr, setSubmitErr] = useState<string | null>(null);
 
   const [songs, setSongs] = useState<SongEntry[]>([]);
+  const [shownSongs, setShownSongs] = useState(10);
   const [songsErr, setSongsErr] = useState<string | null>(null);
 
   const pollStudio = useCallback(async () => {
@@ -596,7 +597,7 @@ export function Generate() {
             <p className="text-sm text-slate-500">No saved generations yet.</p>
           ) : (
             <div className="space-y-4">
-              {songs.map((s) => (
+              {songs.slice(0, shownSongs).map((s) => (
                 <div
                   key={s.repo_id}
                   className="rounded-lg border border-slate-800 bg-slate-900/40 p-4"
@@ -664,6 +665,15 @@ export function Generate() {
                   ) : null}
                 </div>
               ))}
+              {songs.length > shownSongs ? (
+                <button
+                  type="button"
+                  onClick={() => setShownSongs((n) => n + 10)}
+                  className="mt-2 w-full rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+                >
+                  Show more ({songs.length - shownSongs} remaining)
+                </button>
+              ) : null}
             </div>
           )}
         </CardContent>

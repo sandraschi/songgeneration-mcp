@@ -18,7 +18,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  API_BASE,
   fetchHuggingFaceStatus,
   fetchLyriaStatus,
   fetchSettings,
@@ -26,6 +25,7 @@ import {
   type LyriaStatus,
   postSettings,
 } from "@/lib/api";
+import { useLlmStore } from "@/store/llm";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -82,44 +82,18 @@ function StepRow({
 }
 
 function LLMSettings() {
-  const [providers, setProviders] = useState<
-    Record<string, { name: string }[]>
-  >({});
-  const [selectedProvider, setSelectedProvider] = useState("ollama");
-  const [selectedModel, setSelectedModel] = useState("");
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    "loading",
-  );
+  const {
+    providers,
+    selectedProvider,
+    selectedModel,
+    status,
+    refresh,
+    select,
+  } = useLlmStore();
   useEffect(() => {
-    fetch(`${API_BASE}/api/llm/providers`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`providers ${r.status}`);
-        return r.json();
-      })
-      .then((d) => {
-        setProviders(d);
-        const savedP = localStorage.getItem("llm_provider") || "ollama";
-        const savedM = localStorage.getItem("llm_model") || "";
-        setSelectedProvider(savedP);
-        const models = d[savedP === "ollama" ? "ollama" : "lm_studio"] || [];
-        setSelectedModel(
-          savedM && models.some((m: { name: string }) => m.name === savedM)
-            ? savedM
-            : models[0]?.name || "",
-        );
-        setStatus("ready");
-      })
-      .catch(() => {
-        // Backend unreachable: honest empty state, never fake models.
-        setProviders({ ollama: [], lm_studio: [] });
-        setSelectedModel("");
-        setStatus("error");
-      });
-  }, []);
-  const save = (p: string, m: string) => {
-    localStorage.setItem("llm_provider", p);
-    localStorage.setItem("llm_model", m);
-  };
+    void refresh();
+  }, [refresh]);
+  const save = (p: string, m: string) => select(p, m);
   const models =
     providers[selectedProvider === "ollama" ? "ollama" : "lm_studio"] || [];
   return (
@@ -135,7 +109,6 @@ function LLMSettings() {
           className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-200"
           value={selectedProvider}
           onChange={(e) => {
-            setSelectedProvider(e.target.value);
             save(e.target.value, "");
           }}
         >
@@ -146,7 +119,6 @@ function LLMSettings() {
           className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-200"
           value={selectedModel}
           onChange={(e) => {
-            setSelectedModel(e.target.value);
             save(selectedProvider, e.target.value);
           }}
         >

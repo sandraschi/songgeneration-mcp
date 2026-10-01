@@ -107,6 +107,7 @@ export function Listen() {
 
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [trackIdx, setTrackIdx] = useState(0);
+  const [shownCount, setShownCount] = useState(20);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const load = useCallback(async () => {
@@ -501,6 +502,7 @@ export function Listen() {
             <CardContent>
               <div className="max-h-[min(70vh,520px)] space-y-1 overflow-y-auto pr-1">
                 {entries.map((e, i) => {
+                  if (i >= shownCount) return null;
                   const active = i === selectedIdx;
                   const n =
                     (e.mp3_urls?.length ?? 0) + (e.audio_urls?.length ?? 0);
@@ -525,6 +527,15 @@ export function Listen() {
                   );
                 })}
               </div>
+              {entries.length > shownCount ? (
+                <button
+                  type="button"
+                  onClick={() => setShownCount((n) => n + 20)}
+                  className="mt-2 w-full rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+                >
+                  Show more ({entries.length - shownCount} remaining)
+                </button>
+              ) : null}
             </CardContent>
           </Card>
         </div>
