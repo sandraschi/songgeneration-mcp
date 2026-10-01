@@ -19,6 +19,8 @@
     {"name": "unload_models", "description": "Free GPU VRAM"},
     {"name": "diagnostics", "description": "Server diagnostic report"},
     {"name": "shutdown", "description": "Shut down the server process"},
+    {"name": "show_status_card", "description": "GPU/queue/model state as rich in-chat card"},
+    {"name": "show_models_card", "description": "Studio models as rich in-chat card"},
     {"name": "help", "description": "Server help (levels + lyria topic)"}
   ]
 }

@@ -66,3 +66,7 @@ node_modules/
 .env
 *.mcpb
 
+# Playwright traces / reports (regenerable)
+web_sota/test-results/
+web_sota/playwright-report/
+

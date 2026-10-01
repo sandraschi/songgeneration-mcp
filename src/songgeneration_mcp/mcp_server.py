@@ -11,6 +11,7 @@ from pydantic import Field
 
 from .logic import SongGenerationLogic
 from .lyria_compare import get_lyria_vs_sg2_text
+from .prefab_cards import register_prefab_tools
 from .sg2 import SG2_STRUCTURAL_TAGS_REFERENCE
 from .transport import run_server
 
@@ -56,6 +57,7 @@ app = FastMCP(
     ),
 )
 logic = SongGenerationLogic()
+register_prefab_tools(app, logic)
 
 
 @app.resource("api://song-request-schema")
@@ -154,6 +156,7 @@ Tencent SongGeneration v2 (LeVo 2 / SG2) via SongGeneration-Studio - local open-
 - `unload_models` - free VRAM
 - `diagnostics` - server diagnostic report
 - `shutdown` - shut down the server process
+- `show_status_card` / `show_models_card` - rich in-chat Prefab cards
 - `help` - this help (level="basic"|"intermediate"|"advanced", topic="lyria")
 
 ## Key facts

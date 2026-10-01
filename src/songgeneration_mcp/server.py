@@ -478,9 +478,9 @@ async def api_generate_post(request: Request) -> JSONResponse:
     try:
         body = await request.json()
     except Exception as e:
-        return JSONResponse({"success": False, "error": f"invalid json: {e}"}, status_code=400)
+        return _error_response(f"invalid json: {e}")
     if not isinstance(body, dict):
-        return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
+        return _error_response("body must be an object")
     prompt = str(body.get("prompt", body.get("genre", "")))
     try:
         duration = int(body.get("duration", body.get("max_length_seconds", 30)))
@@ -560,9 +560,9 @@ async def api_v1_generate_post(request: Request) -> JSONResponse:
     try:
         body = await request.json()
     except Exception as e:
-        return JSONResponse({"success": False, "error": f"invalid json: {e}"}, status_code=400)
+        return _error_response(f"invalid json: {e}")
     if not isinstance(body, dict):
-        return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
+        return _error_response("body must be an object")
     prompt = str(body.get("prompt", "") or "")
     lyrics = str(body.get("lyrics", "") or "")
     text = prompt.strip() or lyrics.strip()
@@ -656,6 +656,14 @@ async def api_song_get(request: Request) -> JSONResponse:
     if row is None:
         return JSONResponse({"error": "not found"}, status_code=404)
     return JSONResponse(row)
+
+
+def _error_response(message: str, status_code: int = 400, hint: str | None = None) -> JSONResponse:
+    """Shared error shape ``{success: False, error, hint?}`` - the webapp reads ``.error``."""
+    body: dict[str, object] = {"success": False, "error": message}
+    if hint:
+        body["hint"] = hint
+    return JSONResponse(body, status_code=status_code)
 
 
 def _redact_settings(data: dict[str, object]) -> dict[str, object]:
@@ -815,9 +823,9 @@ async def api_export_plex_post(request: Request) -> JSONResponse:
     try:
         body = await request.json()
     except Exception as e:
-        return JSONResponse({"success": False, "error": f"invalid json: {e}"}, status_code=400)
+        return _error_response(f"invalid json: {e}")
     if not isinstance(body, dict):
-        return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
+        return _error_response("body must be an object")
     export_all = bool(body.get("export_all"))
     repo_id = body.get("repo_id")
     if export_all:
@@ -844,9 +852,9 @@ async def api_export_virtualdj_post(request: Request) -> JSONResponse:
     try:
         body = await request.json()
     except Exception as e:
-        return JSONResponse({"success": False, "error": f"invalid json: {e}"}, status_code=400)
+        return _error_response(f"invalid json: {e}")
     if not isinstance(body, dict):
-        return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
+        return _error_response("body must be an object")
     repo_id = body.get("repo_id")
     deck = int(body.get("deck") or 1)
     if not isinstance(repo_id, str) or not repo_id:
@@ -957,9 +965,9 @@ async def api_export_reaper_post(request: Request) -> JSONResponse:
     try:
         body = await request.json()
     except Exception as e:
-        return JSONResponse({"success": False, "error": f"invalid json: {e}"}, status_code=400)
+        return _error_response(f"invalid json: {e}")
     if not isinstance(body, dict):
-        return JSONResponse({"success": False, "error": "body must be an object"}, status_code=400)
+        return _error_response("body must be an object")
     repo_id = body.get("repo_id")
     if not isinstance(repo_id, str) or not repo_id:
         return JSONResponse({"success": False, "error": "repo_id required"}, status_code=400)
@@ -1092,6 +1100,8 @@ async def api_capabilities(_request: Request) -> JSONResponse:
                 "unload_models",
                 "diagnostics",
                 "shutdown",
+                "show_status_card",
+                "show_models_card",
                 "help",
             ],
             "backends": ["lyria", "acestep", "musicgen", "stableaudio", "studio"],
