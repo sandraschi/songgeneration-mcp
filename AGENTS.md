@@ -31,6 +31,7 @@ Lyria (Vertex AI) → ACE-Step 1.5 (:8001) → MusicGen (transformers) → Stabl
 - `unload_models` — free VRAM
 - `diagnostics` — server diagnostic report
 - `shutdown` — shut down the server process
+- `show_status_card` / `show_models_card` — Prefab in-chat cards
 - `help` — server help (levels + lyria topic)
 
 ## Key Files

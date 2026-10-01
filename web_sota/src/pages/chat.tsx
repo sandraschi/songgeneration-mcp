@@ -8,6 +8,7 @@ import {
   User,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { sendChat } from "@/lib/provider";
 
 interface Message {
   role: "user" | "assistant";
@@ -122,20 +123,7 @@ export function Chat() {
         content: m.content,
       }));
       const systemPrompt = PERSONALITIES[personality] || "";
-      const response = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          system_prompt: systemPrompt,
-          context: { history },
-        }),
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const data = await response.json();
-      const reply = data.reply || data.response || "No response from model.";
+      const reply = await sendChat(text, systemPrompt, history);
 
       const assistantMsg: Message = {
         role: "assistant",
