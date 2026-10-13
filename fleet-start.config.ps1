@@ -1,4 +1,4 @@
-﻿# Per-repo fleet start config for songgeneration-mcp
+# Per-repo fleet start config for songgeneration-mcp
 # Edit ports/backend target here - start.ps1 is fleet-standard.
 @{
     Name         = 'songgeneration-mcp'
@@ -10,6 +10,7 @@
         Kind          = 'uvicorn'
         UvicornTarget = 'songgeneration_mcp.server:app'
         SyncExtras    = @('dev')
+        SyncOnStart  = $true
         Env           = @{ WEB_PORT = '10885' }
     }
     Frontend = @{
