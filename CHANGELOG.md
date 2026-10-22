@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Stable Audio 3:** generation no longer depends on the dead Stable Audio Open 1.0 diffusers path. `audiostudio` calls [audio-studio-mcp](https://github.com/kanaworksai-hue/audio-studio-mcp); `sa3` calls the local CPU service on port 11250. See `docs/AUDIO_STUDIO.md`. `GET /api/audio/status`.
 - **LeVo 2 / SG2**: Default `tencent/SongGeneration` + `v2-large`; `max_length_seconds` 270; `bfloat16`; dual-track (`vocal.wav` / `inst.wav`); optional 10s style prompt path.
 - **Docs**: `docs/PRD.md`, `docs/LYRIA_VS_SG2.md`; MCP resource `docs://lyria-vs-sg2`; help compares SG2 to **Gemini Lyria 3 Pro** (cloud pricing vs local fit).
 - **Upstream**: Canonical GitHub — [sandraschi/songgeneration-mcp](https://github.com/sandraschi/songgeneration-mcp).

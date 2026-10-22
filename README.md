@@ -5,10 +5,11 @@
 **One prompt. Several song engines. The first one that works wins.**
 
 An MCP server and React webapp that generate music from text prompts by
-trying **four different song-generation tools** in order - Lyria (Vertex
-AI), ACE-Step 1.5, Stable Audio 3 and the Studio SG2 API - and returning
-the first result that succeeds. Install the backends you want; the server
-routes every prompt to the best one you have.
+trying local and cloud engines in order and returning the first result
+that succeeds. The chain is Lyria, ACE-Step 1.5, [audio-studio-mcp](https://github.com/kanaworksai-hue/audio-studio-mcp)
+(Stable Audio 3 on an NVIDIA GPU), the local Stable Audio 3 CPU service,
+MusicGen, Stable Audio Open 1.0, then Studio SG2. See
+[docs/AUDIO_STUDIO.md](docs/AUDIO_STUDIO.md).
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastMCP](https://img.shields.io/badge/FastMCP-3.4+-purple?style=flat-square)](https://github.com/jlowin/fastmcp)
@@ -27,15 +28,18 @@ and the first available one wins:
 
 | Backend | Quality | Requires | First load |
 |---------|---------|----------|------------|
-| **Lyria 3 Pro** (Vertex AI) | Best | `GOOGLE_CLOUD_PROJECT` env | API call |
-| **ACE-Step 1.5** (local API) | Very good - full songs w/ vocals, MIT | `uv run acestep-api` on :8001 | ~2GB |
-| **Stable Audio 3** (Stability AI) | Good - fast instrumentals | `uv add --optional full stable-audio-3` | ~2GB |
-| **Studio API** (SG2) | Variable | SongGeneration Studio | Port 10930 |
+| **Lyria 3 Pro** (Vertex AI) | Best, with vocals | `GOOGLE_CLOUD_PROJECT` | API call |
+| **ACE-Step 1.5** (local API) | Full songs with vocals, MIT | `uv run acestep-api` on port 8001 | ~2GB |
+| **audio-studio-mcp** | Stable Audio 3 medium, instrumental | NVIDIA GPU, `install.ps1`, HTTP MCP | ~5 GB VRAM |
+| **SA3 CPU service** | Stable Audio 3 small, instrumental | `stable-audio-spike` on port 11250 | ~2 GB RAM |
+| **MusicGen-small** | Simple loops | `uv sync --extra full` | ~2GB |
+| **Stable Audio Open 1.0** | Old instrumental model, CUDA only | gated HF repo, `uv sync --extra full` | ~3GB |
+| **Studio API** (SG2) | Variable, with vocals | SongGeneration Studio | Port 10930 |
 
-So with Lyria configured you get the best quality, with only local backends
-you still get full songs from ACE-Step, and with nothing installed the API
-tells you exactly which backend to install - it never fails silently. See
-[docs/BACKENDS.md](docs/BACKENDS.md) for the full comparison.
+Lyria and ACE-Step are the vocal paths. With neither of those running, an
+instrumental still comes back from audio-studio-mcp or the CPU service on
+port 11250. Stable Audio Open 1.0 is the old CUDA-only model and is not
+that path. See [docs/BACKENDS.md](docs/BACKENDS.md).
 
 ## Quick Start
 
@@ -48,25 +52,26 @@ curl http://127.0.0.1:10885/api/v1/generate -d '{"prompt":"tech house 128 BPM"}'
 ## Install Backends
 
 ```powershell
-# All local backends (recommended)
-just install-all
+# CPU Stable Audio 3 (already the working instrumental path on this machine)
+# from D:\Dev\repos\stable-audio-spike
+service\start.ps1
 
-# Or step by step:
-uv add --optional full stable-audio-3    # Stable Audio 3 (local)
+# NVIDIA Stable Audio 3 medium (audio-studio-mcp). Gated weights, HF login.
+git clone https://github.com/kanaworksai-hue/audio-studio-mcp.git
 git clone https://github.com/ACE-Step/ACE-Step-1.5  # ACE-Step server (local, MIT)
-uv add google-genai                    # Lyria (requires GCP project)
 ```
 
 ## API
 
 `POST /api/v1/generate` - `{"prompt": "...", "duration": 30}`
 
-Returns `{"success": true, "file": "/tmp/...wav", "backend": "lyria|acestep|stableaudio|studio", "model": "..."}`
+Returns `{"success": true, "file": "<wav path>", "backend": "lyria|acestep|audiostudio|sa3|musicgen|stableaudio|studio", "model": "..."}`
 
 ## Documentation
 
 - [Installation](docs/INSTALL.md) - detailed setup, backends, troubleshooting
 - [Backends](docs/BACKENDS.md) - comparison, requirements, tips
+- [Stable Audio 3](docs/AUDIO_STUDIO.md) - why generation was a no-op, and the two local engines
 - [Webapp](docs/WEBAPP.md) - React UI guide
 - [MCP Tools](docs/MCP_TOOLS.md) - FastMCP tool reference
 - [Architecture](docs/ARCHITECTURE.md) - system design, API, data flow
