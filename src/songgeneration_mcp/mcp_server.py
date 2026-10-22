@@ -424,7 +424,7 @@ async def diagnostics() -> str:
     return """# songgeneration-mcp Diagnostics
 - **Status:** Operational
 - **Architecture:** FastMCP 3.4+
-- **Backend:** SongGeneration-Studio REST (SG2 payload) + Lyria/ACE-Step/MusicGen/StableAudio chain
+- **Backend:** Lyria, ACE-Step, audio-studio-mcp, local Stable Audio 3 CPU service, MusicGen, Stable Audio Open 1.0, then Studio SG2. See `docs/AUDIO_STUDIO.md`.
 - **Docs:** `docs/PRD.md`, `docs/LYRIA_VS_SG2.md`; MCP resource `docs://lyria-vs-sg2`
 """
 

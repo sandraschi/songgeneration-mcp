@@ -22,6 +22,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
 
+from songgeneration_mcp.audio_studio import audio_status, prompt_from_generate_body, try_stable_audio3
 from songgeneration_mcp.log_buffer import clear_buffer, get_recent_lines, setup_process_log_buffer
 from songgeneration_mcp.logic import SongGenerationLogic
 from songgeneration_mcp.mcp_server import app as mcp
@@ -290,6 +291,11 @@ async def api_huggingface_status(_request: Request) -> JSONResponse:
     )
 
 
+async def api_audio_status(_request: Request) -> JSONResponse:
+    """Reachability of audio-studio-mcp and the local Stable Audio 3 CPU service."""
+    return JSONResponse(await audio_status())
+
+
 def _run_lyria_sync(prompt: str, duration: int, project: str, lyria_model: str) -> dict[str, object]:
     """Blocking: one Vertex AI Lyria call. Raises on any failure."""
     from google import genai
@@ -391,7 +397,7 @@ def _run_stableaudio_sync(prompt: str, duration: int, hf_token: str | None) -> d
 
 
 async def _try_local_backends(prompt: str, duration: int) -> tuple[dict[str, object] | None, dict[str, str]]:
-    """Quick-chain: Lyria -> ACE-Step -> MusicGen -> Stable Audio Open.
+    """Quick-chain: Lyria -> ACE-Step -> audio-studio / SA3 CPU -> MusicGen -> Stable Audio Open.
 
     Each backend's actual model/API call is synchronous and can run for
     minutes (first-run downloads, GPU inference) -- every one runs via
@@ -456,14 +462,26 @@ async def _try_local_backends(prompt: str, duration: int) -> tuple[dict[str, obj
         errors["acestep"] = str(e) or type(e).__name__
         log.exception("ACE-Step generation failed; falling back to next backend.")
 
-    # Backend 3: MusicGen (local HuggingFace model, first call downloads ~2GB)
+    # Backend 3: Stable Audio 3. audio-studio-mcp (NVIDIA medium) then the
+    # CPU TFLite service. Both are external processes; a refused port is a skip.
+    # See docs/AUDIO_STUDIO.md. Instrumentals only.
+    try:
+        sa3_hit, sa3_errors = await try_stable_audio3(prompt, duration)
+        errors.update(sa3_errors)
+        if sa3_hit is not None:
+            return sa3_hit, errors
+    except Exception as e:
+        errors["sa3"] = str(e) or type(e).__name__
+        log.exception("Stable Audio 3 bridge failed; falling back to next backend.")
+
+    # Backend 4: MusicGen (local HuggingFace model, first call downloads ~2GB)
     try:
         payload = await asyncio.to_thread(_run_musicgen_sync, prompt, duration)
         return payload, errors
     except Exception as e:
         errors["musicgen"] = str(e) or type(e).__name__
 
-    # Backend 4: Stable Audio Open (HuggingFace diffusers, local, first load ~3GB, gated model)
+    # Backend 5: Stable Audio Open 1.0 (diffusers, CUDA, gated). Not Stable Audio 3.
     hf_token = load_settings().get("hf_token") or os.environ.get("HF_TOKEN") or None
     try:
         payload = await asyncio.to_thread(_run_stableaudio_sync, prompt, duration, hf_token)
@@ -481,7 +499,7 @@ async def api_generate_post(request: Request) -> JSONResponse:
         return _error_response(f"invalid json: {e}")
     if not isinstance(body, dict):
         return _error_response("body must be an object")
-    prompt = str(body.get("prompt", body.get("genre", "")))
+    prompt = prompt_from_generate_body(body)
     try:
         duration = int(body.get("duration", body.get("max_length_seconds", 30)))
     except (TypeError, ValueError):
@@ -554,7 +572,8 @@ async def api_v1_generate_post(request: Request) -> JSONResponse:
     """Quick Generate: ``{prompt, duration, lyrics?, model?}``.
 
     Same local-backend chain as ``/api/generate`` (Lyria -> ACE-Step ->
-    MusicGen -> Stable Audio), then Studio SG2 as a last resort. Always returns JSON shaped
+    audio-studio / SA3 CPU -> MusicGen -> Stable Audio Open), then Studio SG2.
+    Always returns JSON shaped
     for the Quick page: ``{success, file, backend, model, ...}``.
     """
     try:
@@ -1104,7 +1123,7 @@ async def api_capabilities(_request: Request) -> JSONResponse:
                 "show_models_card",
                 "help",
             ],
-            "backends": ["lyria", "acestep", "musicgen", "stableaudio", "studio"],
+            "backends": ["lyria", "acestep", "audiostudio", "sa3", "musicgen", "stableaudio", "studio"],
         }
     )
 
@@ -1330,6 +1349,7 @@ app = Starlette(
         Route("/api/studio/info", api_studio_info, methods=["GET"]),
         Route("/api/lyria/status", api_lyria_status, methods=["GET"]),
         Route("/api/huggingface/status", api_huggingface_status, methods=["GET"]),
+        Route("/api/audio/status", api_audio_status, methods=["GET"]),
         Route("/api/generate", api_generate_post, methods=["POST"]),
         Route("/api/v1/generate", api_v1_generate_post, methods=["POST"]),
         Route("/api/v1/diagnostics", api_v1_diagnostics_get, methods=["GET"]),
