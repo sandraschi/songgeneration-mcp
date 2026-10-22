@@ -13,6 +13,32 @@
 
 Best for: full songs, vocals, production-ready audio.
 
+## audio-studio-mcp (Stable Audio 3, NVIDIA)
+
+| | |
+|---|---|
+| **Quality** | Instrumental BGM, loops, sound effects. No vocals. |
+| **Latency** | Medium model, warm, about 1.3 s for 20 s of music on an RTX 3060 (upstream). |
+| **Cost** | Free locally. Weights under the Stability AI Community License. |
+| **Setup** | Clone [audio-studio-mcp](https://github.com/kanaworksai-hue/audio-studio-mcp), run `install.ps1`, accept the gated Hugging Face license, start `--http`. |
+| **Max duration** | 380 s (medium), 120 s (small). |
+| **Contract** | MCP tool `generate_audio`. This server calls it at `SONGGEN_AUDIO_STUDIO_URL` (default `http://127.0.0.1:8765/mcp`). |
+
+Full notes: [AUDIO_STUDIO.md](AUDIO_STUDIO.md).
+
+## Stable Audio 3 CPU service (small models)
+
+| | |
+|---|---|
+| **Quality** | Instrumental beds and one-shot effects from `sm-music` / `sm-sfx`. No vocals. |
+| **Latency** | 60 s bed in 19.3 s on a Ryzen 9 5900X, CPU only (measured 2026-10-21). |
+| **Cost** | Free locally. Same Community License on the weights. |
+| **Setup** | `stable-audio-spike` service, port 11250. No API key. |
+| **Max duration** | 120 s. |
+| **Contract** | `POST /api/generate` with `{prompt, duration}` returns `{success, file}`. `SONGGEN_SA3_URL` overrides the base URL. |
+
+This is the engine that can return a WAV on the current machine without a GPU session or a Hugging Face token.
+
 ## Stable Audio Open 1.0 (Stability AI)
 
 | | |
@@ -54,4 +80,4 @@ Best for: dual-track output (vocal + inst), structural tags.
 
 ## Recommendation
 
-For most users: `just install-all` gives you Lyria → Stable Audio → MusicGen in one command. The API tries them in order and returns whichever succeeds first.
+The API tries Lyria, ACE-Step, audio-studio-mcp, the SA3 CPU service, MusicGen, Stable Audio Open 1.0, then Studio, and returns whichever succeeds first. `GET /api/audio/status` shows whether the two Stable Audio 3 processes are up.
